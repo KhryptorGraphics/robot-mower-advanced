@@ -1,0 +1,215 @@
+# RobotMower Advanced Configuration
+# -------------------------------
+
+system:
+  name: "RobotMower Advanced"
+  version: "2.0.0"
+  log_level: "INFO"
+  data_dir: "/var/lib/robotmower"
+  timezone: "UTC"
+
+hardware:
+  platform: "raspberry_pi"
+  model: "Raspberry Pi 5"
+  accelerator: "Hailo AI HAT"
+  
+  motors:
+    left_motor:
+      enable_pin: 17
+      forward_pin: 27
+      reverse_pin: 22
+      encoder_pin: 10
+      pid:
+        p: 0.5
+        i: 0.1
+        d: 0.05
+        max_i: 50
+    right_motor:
+      enable_pin: 23
+      forward_pin: 24
+      reverse_pin: 25
+      encoder_pin: 11
+      pid:
+        p: 0.5
+        i: 0.1
+        d: 0.05
+        max_i: 50
+    blade_motor:
+      enable_pin: 5
+      pwm_pin: 6
+      speed_sensor_pin: 12
+      safety_switch_pin: 13
+      
+  sensors:
+    ultrasonic:
+      - name: "front"
+        trigger_pin: 16
+        echo_pin: 20
+        min_distance: 5
+        max_distance: 400
+      - name: "left"
+        trigger_pin: 26
+        echo_pin: 19
+        min_distance: 5
+        max_distance: 400
+      - name: "right"
+        trigger_pin: 21
+        echo_pin: 18
+        min_distance: 5
+        max_distance: 400
+    imu:
+      i2c_bus: 1
+      i2c_address: 0x68
+      update_rate: 100
+    gps:
+      uart_port: "/dev/ttyS0"
+      baud_rate: 9600
+      update_rate: 1
+    camera:
+      width: 1280
+      height: 720
+      fps: 30
+      format: "RGB"
+      use_ai_acceleration: true
+    rain_sensor:
+      enable: true
+      pin: 27
+    tilt_sensor:
+      enable: true
+      pin: 22
+    battery:
+      voltage_pin: 4
+      current_pin: 17
+      capacity_mah: 10000
+      cells: 4
+      low_voltage_threshold: 13.2
+      critical_voltage_threshold: 12.8
+    leds:
+      status_led_green: 12
+      status_led_red: 13
+      status_led_blue: 14
+      
+perception:
+  object_detection:
+    enabled: true
+    model: "yolov8n"
+    confidence_threshold: 0.45
+    classes_of_interest: ["person", "dog", "cat", "car", "bicycle"]
+    update_rate: 5
+  slam:
+    enabled: true
+    algorithm: "rtabmap"
+    map_update_rate: 1
+    map_resolution: 0.05
+    map_size: 100
+  lidar:
+    enabled: false  # Set to true if lidar is available
+    port: "/dev/ttyUSB0"
+    baud_rate: 115200
+    
+navigation:
+  path_planning:
+    algorithm: "coverage_path"
+    overlap_percentage: 10
+    pattern: "spiral"  # Options: spiral, lawnmower, adaptive
+    boundary_margin: 0.5
+  obstacle_avoidance:
+    enabled: true
+    safe_distance: 0.5
+    max_speed_near_obstacles: 0.3
+  localization:
+    method: "fusion"  # Options: gps, vision, fusion
+    gps_weight: 0.7
+    vision_weight: 0.3
+    
+autonomy:
+  mowing:
+    default_speed: 0.5
+    max_speed: 1.0
+    blade_speed: 0.8
+    cutting_height: 35  # mm
+    auto_height_adjustment: true
+  scheduling:
+    enabled: true
+    days: [1, 3, 5]  # Mon, Wed, Fri
+    start_time: "10:00"
+    max_duration: 120  # minutes
+    rain_delay: 180  # minutes
+  behaviors:
+    return_to_dock_battery: 20  # Percent
+    emergency_stop_obstacles: ["person", "dog", "cat"]
+    resume_after_obstacle: true
+    resume_delay: 5  # seconds
+    
+communication:
+  server:
+    host: "0.0.0.0"
+    port: 5000
+    ssl:
+      enabled: false
+      cert_file: ""
+      key_file: ""
+  mqtt:
+    enabled: false
+    broker: "localhost"
+    port: 1883
+    username: ""
+    password: ""
+    topic_prefix: "robotmower/"
+  remote_access:
+    enabled: true
+    service: "builtin"  # Options: builtin, ngrok, cloudflare
+    
+security:
+  authentication:
+    enabled: true
+    method: "jwt"
+    secret_key: "change_this_to_a_secure_random_string"
+    session_timeout: 3600
+  users:
+    - username: "admin"
+      password_hash: "change_this_to_a_secure_hash"
+      role: "admin"
+    - username: "user"
+      password_hash: "change_this_to_a_secure_hash"
+      role: "user"
+      
+web_interface:
+  features:
+    live_map: true
+    coverage_visualization: true
+    statistics: true
+    battery_monitoring: true
+    maintenance_tracking: true
+    firmware_updates: true
+
+data:
+  storage:
+    images: true
+    logs: true
+    telemetry: true
+    retention_days: 30
+  database:
+    type: "sqlite"  # Options: sqlite, postgresql, mongodb
+    path: "data/robotmower.db"
+  backup:
+    enabled: true
+    schedule: "0 0 * * 0"  # Weekly at midnight on Sunday
+    target: "data/backups"
+    
+geofencing:
+  enabled: true
+  boundary_enforcement: "soft"  # Options: none, soft, hard
+  no_mow_zones:
+    - name: "Flower bed"
+      points: [[0, 0], [0, 5], [5, 5], [5, 0]]
+    - name: "Pool area"
+      points: [[10, 10], [10, 15], [15, 15], [15, 10]]
+  
+maintenance:
+  blade_replacement:
+    remind_hours: 50
+    last_replaced: "2025-01-01"
+  filter_cleaning:
+    remind_hours: 10
+    last_cleaned: "2025-01-01"
