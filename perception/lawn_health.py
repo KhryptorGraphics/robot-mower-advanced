@@ -65,16 +65,17 @@ class LawnHealthAnalyzer:
     provides recommendations for lawn care.
     """
     
-    def __init__(self, config: Dict[str, Any], camera: Camera):
+    def __init__(self, config: Dict[str, Any], sensors: Dict[str, Any]):
         """
         Initialize the lawn health analyzer
         
         Args:
             config: Configuration dictionary
-            camera: Camera instance for capturing images
+            sensors: Dictionary of sensors
         """
         self.logger = logging.getLogger(__name__)
-        self.camera = camera
+        self.sensors = sensors
+        self.camera = sensors.get("camera") if sensors else None
         
         # Configuration
         self.config = config

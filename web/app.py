@@ -661,7 +661,7 @@ class WebInterface:
         
         # Add power status
         if self.power_manager:
-            battery_level = self.power_manager.get_battery_level()
+            battery_level = self.power_manager.get_battery_percentage()
             charging = self.power_manager.is_charging()
             
             status["power"] = {

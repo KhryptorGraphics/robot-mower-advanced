@@ -357,15 +357,17 @@ class ZoneManager:
     Handles creation, loading, saving and management of lawn zones.
     """
     
-    def __init__(self, config: ConfigManager):
+    def __init__(self, config: ConfigManager, sensors: Optional[Dict[str, Any]] = None):
         """
         Initialize the zone manager
         
         Args:
             config: ConfigManager instance for configuration
+            sensors: Dictionary of sensors (optional)
         """
         self.logger = logging.getLogger(__name__)
         self.config = config
+        self.sensors = sensors
         
         # Configuration
         data_dir = config.get("system.data_dir", "data")

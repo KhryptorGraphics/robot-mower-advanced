@@ -75,17 +75,18 @@ class ObjectDetector:
     objects such as people, children, and pets.
     """
     
-    def __init__(self, config: ConfigManager, camera: Camera):
+    def __init__(self, config: ConfigManager, sensors: Dict[str, Any]):
         """
         Initialize the object detector
         
         Args:
             config: Configuration manager
-            camera: Camera instance for capturing images
+            sensors: Dictionary of sensors
         """
         self.logger = logging.getLogger(__name__)
         self.config = config
-        self.camera = camera
+        self.sensors = sensors
+        self.camera = sensors.get("camera") if sensors else None
         
         # Configuration
         self.detection_interval = config.get("object_detection.interval", 0.2)  # Seconds
@@ -526,13 +527,13 @@ class ChildAnimalDetector(ObjectDetector):
     for detecting and avoiding children and animals.
     """
     
-    def __init__(self, config: ConfigManager, camera: Camera):
+    def __init__(self, config: ConfigManager, sensors: Dict[str, Any]):
         """
         Initialize the child and animal detector
         
         Args:
             config: Configuration manager
-            camera: Camera instance for capturing images
+            sensors: Dictionary of sensors
         """
         # Modify configuration for specialized detection
         # First, get a copy of the configuration to not modify the original
@@ -548,7 +549,7 @@ class ChildAnimalDetector(ObjectDetector):
         child_config.set("object_detection.pet_safety_radius", 4.0)  # Larger safety radius
         
         # Initialize the base object detector with modified config
-        super().__init__(child_config, camera)
+        super().__init__(child_config, sensors)
         
         # Additional state for persistent tracking
         self.child_detected_time = None

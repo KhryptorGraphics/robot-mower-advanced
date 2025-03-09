@@ -1,215 +1,267 @@
-# RobotMower Advanced Configuration
-# -------------------------------
+# Robot Mower Advanced Default Configuration
 
+# System configuration
 system:
-  name: "RobotMower Advanced"
-  version: "2.0.0"
+  app_name: "RobotMower"
+  data_dir: "data"
   log_level: "INFO"
-  data_dir: "/var/lib/robotmower"
-  timezone: "UTC"
+  log_file: "logs/robot_mower.log"
+  simulation_mode: false
 
+# Hardware configuration
 hardware:
-  platform: "raspberry_pi"
-  model: "Raspberry Pi 5"
-  accelerator: "Hailo AI HAT"
-  
-  motors:
+  # Motor controller settings
+  motor_controller:
+    type: "pwm"  # 'pwm' or other controller types
     left_motor:
-      enable_pin: 17
-      forward_pin: 27
-      reverse_pin: 22
-      encoder_pin: 10
+      pwm_pin: 12
+      dir_pin: 16
+      encoder_pin_a: 23
+      encoder_pin_b: 24
+      reverse_direction: false
       pid:
         p: 0.5
         i: 0.1
         d: 0.05
-        max_i: 50
+        max_i: 100.0
     right_motor:
-      enable_pin: 23
-      forward_pin: 24
-      reverse_pin: 25
-      encoder_pin: 11
+      pwm_pin: 13
+      dir_pin: 20
+      encoder_pin_a: 25
+      encoder_pin_b: 26
+      reverse_direction: false
       pid:
         p: 0.5
         i: 0.1
         d: 0.05
-        max_i: 50
-    blade_motor:
-      enable_pin: 5
-      pwm_pin: 6
-      speed_sensor_pin: 12
-      safety_switch_pin: 13
-      
+        max_i: 100.0
+
+  # Blade motor settings
+  blade_motor:
+    type: "rpi"  # 'rpi' or 'pwm'
+    pwm_pin: 18
+    dir_pin: 22
+    speed: 0.8  # Default speed (0.0-1.0)
+    height_control:
+      servo_pin: 27
+      min_height_mm: 20
+      max_height_mm: 80
+      default_height_mm: 35
+
+  # Battery/power settings
+  battery:
+    monitor_pin: 4  # ADC pin for voltage monitoring
+    voltage_factor: 10.0  # Voltage divider factor
+    low_voltage_threshold: 11.0  # Volts
+    critical_voltage_threshold: 10.5  # Volts
+    max_runtime_hours: 4.0  # Maximum runtime on full charge
+
+  # Sensors
   sensors:
+    # Ultrasonic distance sensors
     ultrasonic:
       - name: "front"
-        trigger_pin: 16
-        echo_pin: 20
-        min_distance: 5
-        max_distance: 400
+        trigger_pin: 5
+        echo_pin: 6
+        max_distance_m: 4.0
+        orientation_deg: 0  # Front-facing
       - name: "left"
-        trigger_pin: 26
-        echo_pin: 19
-        min_distance: 5
-        max_distance: 400
+        trigger_pin: 17
+        echo_pin: 27
+        max_distance_m: 2.0
+        orientation_deg: 270  # Left side
       - name: "right"
-        trigger_pin: 21
-        echo_pin: 18
-        min_distance: 5
-        max_distance: 400
+        trigger_pin: 22
+        echo_pin: 23
+        max_distance_m: 2.0
+        orientation_deg: 90  # Right side
+
+    # IMU sensor (MPU6050)
     imu:
       i2c_bus: 1
       i2c_address: 0x68
-      update_rate: 100
+      orientation_correction:
+        roll_offset_deg: 0.0
+        pitch_offset_deg: 0.0
+        yaw_offset_deg: 0.0
+
+    # GPS sensor
     gps:
-      uart_port: "/dev/ttyS0"
+      port: "/dev/ttyAMA0"
       baud_rate: 9600
-      update_rate: 1
+      update_rate_hz: 1.0
+      min_satellites: 4
+
+    # Camera
     camera:
-      width: 1280
-      height: 720
-      fps: 30
-      format: "RGB"
-      use_ai_acceleration: true
+      resolution:
+        width: 640
+        height: 480
+      framerate: 15
+      rotation_deg: 0
+      enable_preview: false
+
+    # Rain sensor
     rain_sensor:
-      enable: true
-      pin: 27
+      pin: 16
+      type: "digital"  # 'digital' or 'analog'
+      threshold: 500  # For analog sensors
+
+    # Tilt sensor
     tilt_sensor:
-      enable: true
-      pin: 22
-    battery:
-      voltage_pin: 4
-      current_pin: 17
-      capacity_mah: 10000
-      cells: 4
-      low_voltage_threshold: 13.2
-      critical_voltage_threshold: 12.8
-    leds:
-      status_led_green: 12
-      status_led_red: 13
-      status_led_blue: 14
-      
-perception:
-  object_detection:
-    enabled: true
-    model: "yolov8n"
-    confidence_threshold: 0.45
-    classes_of_interest: ["person", "dog", "cat", "car", "bicycle"]
-    update_rate: 5
-  slam:
-    enabled: true
-    algorithm: "rtabmap"
-    map_update_rate: 1
-    map_resolution: 0.05
-    map_size: 100
-  lidar:
-    enabled: false  # Set to true if lidar is available
-    port: "/dev/ttyUSB0"
-    baud_rate: 115200
-    
+      use_imu: true  # Use IMU for tilt sensing instead of dedicated sensor
+      pin: 26  # Only used if use_imu is false
+      max_tilt_deg: 25.0  # Maximum safe tilt angle
+
+# Navigation settings
 navigation:
-  path_planning:
-    algorithm: "coverage_path"
-    overlap_percentage: 10
-    pattern: "spiral"  # Options: spiral, lawnmower, adaptive
-    boundary_margin: 0.5
+  # Edge following
+  edge_following:
+    speed: 0.4  # Movement speed during edge following (0.0-1.0)
+    distance: 0.15  # Target distance from edge in meters
+    correction_factor: 1.2  # Steering correction strength
+    max_correction: 0.7  # Maximum steering correction
+    min_distance: 0.05  # Minimum detectable edge distance
+    max_distance: 0.5  # Maximum detectable edge distance
+    completion_threshold: 0.2  # Distance to consider edge complete
+    lost_edge_threshold: 3  # Seconds before considering edge lost
+    max_lost_distance: 1.0  # Maximum search distance when edge is lost
+
+  # Obstacle avoidance
   obstacle_avoidance:
     enabled: true
-    safe_distance: 0.5
-    max_speed_near_obstacles: 0.3
-  localization:
-    method: "fusion"  # Options: gps, vision, fusion
-    gps_weight: 0.7
-    vision_weight: 0.3
-    
-autonomy:
-  mowing:
-    default_speed: 0.5
-    max_speed: 1.0
-    blade_speed: 0.8
-    cutting_height: 35  # mm
-    auto_height_adjustment: true
-  scheduling:
-    enabled: true
-    days: [1, 3, 5]  # Mon, Wed, Fri
-    start_time: "10:00"
-    max_duration: 120  # minutes
-    rain_delay: 180  # minutes
-  behaviors:
-    return_to_dock_battery: 20  # Percent
-    emergency_stop_obstacles: ["person", "dog", "cat"]
-    resume_after_obstacle: true
-    resume_delay: 5  # seconds
-    
-communication:
-  server:
-    host: "0.0.0.0"
-    port: 5000
-    ssl:
-      enabled: false
-      cert_file: ""
-      key_file: ""
-  mqtt:
-    enabled: false
-    broker: "localhost"
-    port: 1883
-    username: ""
-    password: ""
-    topic_prefix: "robotmower/"
-  remote_access:
-    enabled: true
-    service: "builtin"  # Options: builtin, ngrok, cloudflare
-    
-security:
-  authentication:
-    enabled: true
-    method: "jwt"
-    secret_key: "change_this_to_a_secure_random_string"
-    session_timeout: 3600
-  users:
-    - username: "admin"
-      password_hash: "change_this_to_a_secure_hash"
-      role: "admin"
-    - username: "user"
-      password_hash: "change_this_to_a_secure_hash"
-      role: "user"
-      
-web_interface:
-  features:
-    live_map: true
-    coverage_visualization: true
-    statistics: true
-    battery_monitoring: true
-    maintenance_tracking: true
-    firmware_updates: true
+    stop_distance: 0.5  # Distance to stop before obstacle (meters)
+    slow_distance: 1.0  # Distance to slow down (meters)
+    side_clearance: 0.3  # Side clearance (meters)
+    max_detour_distance: 5.0  # Maximum detour distance
+    recovery_attempts: 3  # Max attempts to recover
 
-data:
-  storage:
-    images: true
-    logs: true
-    telemetry: true
-    retention_days: 30
-  database:
-    type: "sqlite"  # Options: sqlite, postgresql, mongodb
-    path: "data/robotmower.db"
-  backup:
+# Perception settings
+perception:
+  # Object detection
+  object_detection:
     enabled: true
-    schedule: "0 0 * * 0"  # Weekly at midnight on Sunday
-    target: "data/backups"
-    
-geofencing:
+    interval: 0.2  # Detection interval in seconds
+    confidence_threshold: 0.5  # Minimum confidence to consider a detection
+    iou_threshold: 0.5  # IoU threshold for non-maximum suppression
+    max_distance: 5.0  # Maximum detection distance in meters
+    safety_radius: 2.0  # Safety radius around mower (meters)
+    child_safety_radius: 4.0  # Safety radius for children (meters)
+    pet_safety_radius: 3.0  # Safety radius for pets (meters)
+    save_detections: true
+    history_limit: 100
+
+  # Lawn health analysis
+  lawn_health:
+    analysis_interval: 3600  # Analysis interval in seconds
+    save_images: true
+    image_save_path: "data/lawn_images"
+    report_save_path: "data/lawn_reports"
+
+# Mowing settings
+mowing:
+  cutting_height: 35  # Default cutting height in mm
+  blade_speed: 0.8  # Default blade speed (0.0-1.0)
+  mowing_speed: 0.5  # Default mowing speed (0.0-1.0)
+  overlap_percent: 10  # Overlap between passes (%)
+  default_pattern: "parallel"  # parallel, spiral, zigzag, random, perimeter_first
+
+# Security settings
+security:
+  theft_protection:
+    enabled: true
+    geofence_enabled: true
+    geofence_radius: 100.0  # Meters
+    geofence_center: null  # Will be set automatically on first use
+    alarm_enabled: true
+    alarm_delay: 30  # Seconds
+    position_update_interval: 60  # Seconds
+    suspicious_movement_threshold: 5.0  # Acceleration threshold (m/s²)
+    email_notifications: false
+    email_recipient: ""
+    email_sender: ""
+    email_smtp_server: ""
+    email_smtp_port: 587
+    email_smtp_username: ""
+    email_smtp_password: ""
+    sms_notifications: false
+    sms_recipient: ""
+    sms_provider_url: ""
+    sms_provider_api_key: ""
+
+# Web interface settings
+web:
   enabled: true
-  boundary_enforcement: "soft"  # Options: none, soft, hard
-  no_mow_zones:
-    - name: "Flower bed"
-      points: [[0, 0], [0, 5], [5, 5], [5, 0]]
-    - name: "Pool area"
-      points: [[10, 10], [10, 15], [15, 15], [15, 10]]
-  
+  host: "0.0.0.0"
+  port: 8080
+  debug: false
+  enable_https: false
+  cert_file: ""
+  key_file: ""
+  require_login: true
+  session_timeout: 3600  # 1 hour
+  jwt_secret: ""  # Will be generated automatically if empty
+
+# Scheduling settings
+scheduling:
+  weather_based:
+    enabled: true
+    forecast_days: 5
+    update_interval: 3600  # Seconds
+    min_reschedule_notice: 3  # Hours
+    max_reschedule_delay: 48  # Hours
+    rain_delay: 3  # Hours after rain
+    reschedule_medium_impact: true
+    reschedule_low_impact: false
+
+# Maintenance settings
 maintenance:
+  enabled: true
+  update_interval: 60.0  # Seconds
+  notify_overdue: true
+  auto_schedule: false
+  
+  # Maintenance intervals (hours)
   blade_replacement:
-    remind_hours: 50
-    last_replaced: "2025-01-01"
+    interval_hours: 50.0
   filter_cleaning:
-    remind_hours: 10
-    last_cleaned: "2025-01-01"
+    interval_hours: 20.0
+  general_inspection:
+    interval_hours: 100.0
+  motor_maintenance:
+    interval_hours: 200.0
+  battery_maintenance:
+    interval_cycles: 50
+  software_update:
+    interval_hours: 168.0  # Weekly
+  sensor_cleaning:
+    interval_hours: 50.0
+
+# Weather settings
+weather:
+  api:
+    enabled: false
+    key: ""
+    url: "https://api.openweathermap.org/data/2.5/forecast"
+    provider: "openweathermap"
+  
+  # Weather impact thresholds
+  thresholds:
+    high_precipitation: 5.0  # mm
+    medium_precipitation: 1.0  # mm
+    low_precipitation: 0.2  # mm
+    high_precipitation_probability: 80.0  # %
+    medium_precipitation_probability: 50.0  # %
+    low_precipitation_probability: 30.0  # %
+    high_temperature: 35.0  # °C
+    low_temperature: 0.0  # °C
+    high_wind: 10.0  # m/s
+    medium_wind: 7.0  # m/s
+    low_visibility: 1000.0  # meters
+
+# Location settings (will be set on first use if GPS is available)
+location:
+  latitude: 0.0
+  longitude: 0.0
+  city: "Unknown"
+  country: "Unknown"

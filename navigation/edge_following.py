@@ -50,7 +50,7 @@ class EdgeTarget:
     overlap: float = 0.05  # Overlap between passes in meters
     
 
-class EdgeFollower:
+class EdgeFollowingController:
     """
     Edge following controller for precise edge mowing
     
@@ -61,19 +61,22 @@ class EdgeFollower:
     def __init__(self, 
                  config: ConfigManager, 
                  motor_controller: MotorController,
-                 distance_sensors: Dict[str, DistanceSensor]):
+                 sensors: Dict[str, Any]):
         """
         Initialize the edge follower
         
         Args:
             config: Configuration manager
             motor_controller: Motor controller for movement
-            distance_sensors: Distance sensors for edge detection
+            sensors: Dictionary of sensors
         """
         self.logger = logging.getLogger(__name__)
         self.config = config
         self.motor_controller = motor_controller
-        self.distance_sensors = distance_sensors
+        self.distance_sensors = {
+            name: sensor for name, sensor in sensors.items() 
+            if isinstance(sensor, DistanceSensor)
+        } if sensors else {}
         
         # Configuration parameters
         self.edge_following_speed = config.get("edge_following.speed", 0.4)  # 0-1 scale

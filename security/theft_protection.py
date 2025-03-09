@@ -55,26 +55,23 @@ class TheftProtection:
     
     def __init__(self, 
                  config: ConfigManager, 
-                 gps_sensor: GPSSensor,
-                 imu_sensor: IMUSensor,
-                 indicator: StatusIndicator,
-                 power_manager: PowerManagement):
+                 sensors: Optional[Dict[str, Any]] = None):
         """
         Initialize the theft protection system
         
         Args:
             config: Configuration manager
-            gps_sensor: GPS sensor for position tracking
-            imu_sensor: IMU sensor for motion detection
-            indicator: Status indicator for alarms
-            power_manager: Power management for remote disable
+            sensors: Dictionary of sensors
         """
         self.logger = logging.getLogger(__name__)
         self.config = config
-        self.gps_sensor = gps_sensor
-        self.imu_sensor = imu_sensor
-        self.indicator = indicator
-        self.power_manager = power_manager
+        self.sensors = sensors or {}
+        
+        # Extract required sensors from the dictionary
+        self.gps_sensor = sensors.get("gps") if sensors else None
+        self.imu_sensor = sensors.get("imu") if sensors else None
+        self.indicator = sensors.get("status_indicator") if sensors else None
+        self.power_manager = sensors.get("power") if sensors else None
         
         # Load configuration
         self.enabled = config.get("security.theft_protection.enabled", True)

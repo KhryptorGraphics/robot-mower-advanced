@@ -1,0 +1,43 @@
+# Core dependencies
+PyYAML>=6.0                # For configuration file handling
+numpy>=1.19.0              # Numerical operations
+requests>=2.25.1           # HTTP requests
+pillow>=8.2.0              # Image processing
+pynmea2>=1.18.0            # NMEA GPS data parsing
+schedule>=1.1.0            # Task scheduling
+pyserial>=3.5              # Serial communication for GPS
+python-dateutil>=2.8.2     # Date handling utilities
+
+# Hardware interfaces (for Raspberry Pi)
+RPi.GPIO>=0.7.0            # GPIO access for Raspberry Pi
+gpiozero>=1.6.2            # High-level GPIO interface
+smbus2>=0.4.1              # I2C communication
+picamera2>=0.3.12          # Camera interface for Raspberry Pi (libcamera-based)
+
+# Web interface
+Flask>=2.0.1               # Web server
+Flask-SocketIO>=5.1.1      # Real-time communication
+eventlet>=0.33.0           # WebSocket support
+python-jwt>=3.3.0          # JWT for authentication
+bcrypt>=3.2.0              # Password hashing
+
+# Computer vision and ML
+opencv-python>=4.5.1       # Computer vision
+# opencv-python-headless>=4.5.1  # Headless version for systems without GUI
+# Use one of the following for TensorFlow:
+# tensorflow>=2.8.0         # Full TensorFlow (for development)
+# tensorflow-lite>=2.8.0    # TensorFlow Lite (if available)
+# tflite-runtime>=2.8.0     # TFLite runtime (for deployment)
+
+# Data handling
+pandas>=1.3.0              # Data analysis (optional but useful)
+matplotlib>=3.5.0          # For visualization in development
+
+# Simulation
+pygame>=2.1.0              # For simulated environment (dev/testing)
+
+# Development dependencies
+pytest>=6.2.5              # Testing
+pylint>=2.8.2              # Code quality
+autopep8>=1.5.7            # Code formatting
+black>=22.1.0              # Code formatting

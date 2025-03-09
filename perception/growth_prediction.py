@@ -49,13 +49,13 @@ class GrassGrowthPredictor:
     to predict future grass growth rates.
     """
     
-    def __init__(self, config: ConfigManager, health_analyzer: LawnHealthAnalyzer):
+    def __init__(self, config: ConfigManager, health_analyzer: Optional[LawnHealthAnalyzer] = None):
         """
         Initialize the grass growth predictor
         
         Args:
             config: Configuration manager
-            health_analyzer: Lawn health analyzer for current lawn conditions
+            health_analyzer: Lawn health analyzer for current lawn conditions (optional)
         """
         self.logger = logging.getLogger(__name__)
         self.config = config
