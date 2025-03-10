@@ -2,7 +2,8 @@
 Hailo NPU Integration Module for Robot Mower Advanced
 
 This module provides integration with the Hailo NPU HAT for Raspberry Pi,
-allowing real-time object detection and avoidance using deep learning models.
+allowing real-time object detection, environmental mapping, and obstacle avoidance
+using deep learning models for superior perception capabilities.
 """
 
 import os
@@ -12,6 +13,8 @@ import threading
 import numpy as np
 import cv2
 from typing import List, Dict, Tuple, Optional, Union, Any
+from collections import deque
+import json
 
 # Import Hailo SDK - this will be installed via the installation script
 try:
@@ -43,7 +46,396 @@ OBSTACLE_CATEGORIES = [
 ]
 
 # Safety critical obstacles (require immediate stopping)
-SAFETY_CRITICAL = ["person", "dog", "cat"]
+SAFETY_CRITICAL = ["person", "dog", "cat", "child"]
+
+# Yard objects (items that might be lawn furniture, decorations, etc.)
+YARD_OBJECTS = ["chair", "bench", "potted plant", "couch", "vase", "boat"]
+
+
+class EnvironmentalMap:
+    """
+    Maintains a map of the yard environment with detected objects, obstacles, and boundaries.
+    This is used for persistent object tracking, obstacle memory, and learning the yard layout.
+    """
+    
+    def __init__(self, config: Dict[str, Any]):
+        """
+        Initialize the environmental map
+
+        Args:
+            config: Configuration dictionary
+        """
+        self.logger = logging.getLogger(__name__)
+        self.config = config
+        
+        # Map dimensions in grid cells
+        self.map_resolution = config.get("environmental_mapping", {}).get("resolution", 0.1)  # meters per cell
+        self.map_size_meters = config.get("environmental_mapping", {}).get("size", 50.0)  # size in meters
+        self.grid_size = int(self.map_size_meters / self.map_resolution)
+        
+        # Create maps
+        self.obstacle_memory = np.zeros((self.grid_size, self.grid_size), dtype=np.float32)
+        self.object_map = {}  # Dictionary to store persistent objects by ID
+        self.boundary_map = np.zeros((self.grid_size, self.grid_size), dtype=np.uint8)
+        
+        # Object tracking
+        self.next_object_id = 0
+        self.object_tracking_threshold = config.get("environmental_mapping", {}).get("tracking_threshold", 0.6)
+        self.object_memory_duration = config.get("environmental_mapping", {}).get("memory_duration", 3600)  # seconds
+        
+        # Position reference (local coordinate system)
+        self.origin_x = self.grid_size // 2
+        self.origin_y = self.grid_size // 2
+        
+        # Persistence
+        self.data_dir = config.get("system", {}).get("data_dir", "data")
+        self.map_file = os.path.join(self.data_dir, "environmental_map.json")
+        self.loaded = self.load_map()
+        
+        self.logger.info("Environmental map initialized")
+    
+    def update_obstacle_memory(self, 
+                              obstacles: List[Dict[str, Any]], 
+                              mower_position: Tuple[float, float], 
+                              mower_heading: float) -> None:
+        """
+        Update the obstacle memory map with new detections
+
+        Args:
+            obstacles: List of detected obstacles
+            mower_position: (x, y) position of the mower in meters
+            mower_heading: Heading of the mower in radians
+        """
+        decay_factor = 0.99  # Gradually decay old obstacle detections
+        self.obstacle_memory *= decay_factor
+        
+        # Convert mower position to grid coordinates
+        grid_x = int(mower_position[0] / self.map_resolution) + self.origin_x
+        grid_y = int(mower_position[1] / self.map_resolution) + self.origin_y
+        
+        # Update map with new obstacles
+        for obstacle in obstacles:
+            distance = obstacle.get("distance", 0)
+            angle = self._calculate_angle(obstacle, mower_heading)
+            
+            # Convert to local coordinates
+            obstacle_x = grid_x + int((distance * np.cos(angle)) / self.map_resolution)
+            obstacle_y = grid_y + int((distance * np.sin(angle)) / self.map_resolution)
+            
+            # Ensure coordinates are within map bounds
+            if 0 <= obstacle_x < self.grid_size and 0 <= obstacle_y < self.grid_size:
+                # Higher confidence and safety-critical obstacles get higher values
+                confidence = obstacle.get("confidence", 0.5)
+                safety_factor = 2.0 if obstacle.get("is_safety_critical", False) else 1.0
+                
+                # Update the map with a Gaussian distribution centered at the obstacle
+                radius = max(1, int(1.0 / self.map_resolution))  # 1 meter radius
+                self._add_gaussian_obstacle(obstacle_x, obstacle_y, radius, confidence * safety_factor)
+    
+    def _add_gaussian_obstacle(self, center_x: int, center_y: int, radius: int, weight: float) -> None:
+        """
+        Add a Gaussian distribution representing an obstacle to the map
+
+        Args:
+            center_x: X coordinate of obstacle center (grid coordinates)
+            center_y: Y coordinate of obstacle center (grid coordinates)
+            radius: Radius of influence in grid cells
+            weight: Weight of the obstacle (based on confidence and safety factor)
+        """
+        for y in range(max(0, center_y - radius), min(self.grid_size, center_y + radius + 1)):
+            for x in range(max(0, center_x - radius), min(self.grid_size, center_x + radius + 1)):
+                dx = x - center_x
+                dy = y - center_y
+                distance = np.sqrt(dx*dx + dy*dy)
+                if distance <= radius:
+                    # Apply Gaussian weight based on distance from center
+                    gaussian_weight = weight * np.exp(-(distance*distance) / (2 * (radius/2)**2))
+                    # Update map value, capped at 1.0
+                    self.obstacle_memory[y, x] = min(1.0, self.obstacle_memory[y, x] + gaussian_weight)
+    
+    def _calculate_angle(self, obstacle: Dict[str, Any], mower_heading: float) -> float:
+        """
+        Calculate the angle to an obstacle relative to the mower's heading
+
+        Args:
+            obstacle: Obstacle dictionary
+            mower_heading: Mower heading in radians
+
+        Returns:
+            Angle to the obstacle in radians
+        """
+        # In a real implementation, this would use the horizontal position
+        # of the obstacle in the camera frame to estimate the angle
+        bbox = obstacle.get("bbox", [0, 0, 0, 0])
+        image_width = 640  # Assumed camera width
+        
+        # Calculate relative angle from image coordinates
+        center_x = (bbox[0] + bbox[2]) / 2
+        relative_angle = (center_x / image_width - 0.5) * np.radians(60)  # Assuming 60° horizontal FOV
+        
+        # Add to mower heading
+        return mower_heading + relative_angle
+    
+    def track_persistent_objects(self, 
+                               detections: List[Dict[str, Any]], 
+                               timestamp: float,
+                               mower_position: Tuple[float, float], 
+                               mower_heading: float) -> None:
+        """
+        Track objects across frames and maintain persistent objects in the map
+
+        Args:
+            detections: List of detected objects
+            timestamp: Current timestamp
+            mower_position: (x, y) position of the mower in meters
+            mower_heading: Heading of the mower in radians
+        """
+        # Convert mower position to grid coordinates
+        grid_x = int(mower_position[0] / self.map_resolution) + self.origin_x
+        grid_y = int(mower_position[1] / self.map_resolution) + self.origin_y
+        
+        # Calculate positions for new detections
+        new_detections = []
+        for detection in detections:
+            if detection.get("class") in YARD_OBJECTS:
+                distance = detection.get("distance", 0)
+                angle = self._calculate_angle(detection, mower_heading)
+                
+                # Convert to world coordinates
+                obj_x = grid_x + int((distance * np.cos(angle)) / self.map_resolution)
+                obj_y = grid_y + int((distance * np.sin(angle)) / self.map_resolution)
+                
+                new_detections.append({
+                    "class": detection.get("class", "unknown"),
+                    "confidence": detection.get("confidence", 0.5),
+                    "position": (obj_x, obj_y),
+                    "last_seen": timestamp,
+                    "times_detected": 1
+                })
+        
+        # Match new detections with existing objects
+        matched_ids = set()
+        for detection in new_detections:
+            best_match_id = None
+            best_match_distance = float('inf')
+            
+            for obj_id, obj in self.object_map.items():
+                # Skip if already matched in this iteration
+                if obj_id in matched_ids:
+                    continue
+                
+                # Skip if class doesn't match
+                if obj["class"] != detection["class"]:
+                    continue
+                
+                # Calculate distance between positions
+                obj_pos = obj["position"]
+                det_pos = detection["position"]
+                distance = np.sqrt((obj_pos[0] - det_pos[0])**2 + (obj_pos[1] - det_pos[1])**2)
+                
+                # Check if this is a better match
+                if distance < best_match_distance and distance < (5.0 / self.map_resolution):
+                    best_match_distance = distance
+                    best_match_id = obj_id
+            
+            # If we found a match, update the existing object
+            if best_match_id is not None:
+                obj = self.object_map[best_match_id]
+                obj["last_seen"] = timestamp
+                obj["times_detected"] += 1
+                obj["confidence"] = (obj["confidence"] * (obj["times_detected"] - 1) + detection["confidence"]) / obj["times_detected"]
+                # Do a weighted average of the position to smooth out noise
+                weight = 1.0 / obj["times_detected"]
+                obj["position"] = (
+                    obj["position"][0] * (1 - weight) + detection["position"][0] * weight,
+                    obj["position"][1] * (1 - weight) + detection["position"][1] * weight
+                )
+                matched_ids.add(best_match_id)
+            else:
+                # If no match, add a new object
+                self.object_map[self.next_object_id] = detection
+                self.next_object_id += 1
+        
+        # Clean up old objects
+        current_ids = list(self.object_map.keys())
+        for obj_id in current_ids:
+            if timestamp - self.object_map[obj_id]["last_seen"] > self.object_memory_duration:
+                del self.object_map[obj_id]
+    
+    def update_boundary(self, boundary_points: List[Tuple[float, float]]) -> None:
+        """
+        Update the yard boundary map
+
+        Args:
+            boundary_points: List of (x, y) coordinates defining the boundary
+        """
+        if not boundary_points or len(boundary_points) < 3:
+            return
+        
+        # Create a new boundary map
+        new_boundary = np.zeros((self.grid_size, self.grid_size), dtype=np.uint8)
+        
+        # Convert boundary points to grid coordinates
+        grid_points = []
+        for point in boundary_points:
+            grid_x = int(point[0] / self.map_resolution) + self.origin_x
+            grid_y = int(point[1] / self.map_resolution) + self.origin_y
+            grid_points.append((grid_x, grid_y))
+        
+        # Create a polygon mask
+        grid_points_array = np.array(grid_points, dtype=np.int32)
+        cv2.fillPoly(new_boundary, [grid_points_array], 1)
+        
+        # Update the boundary map
+        self.boundary_map = new_boundary
+    
+    def is_in_boundary(self, position: Tuple[float, float]) -> bool:
+        """
+        Check if a position is within the yard boundary
+
+        Args:
+            position: (x, y) position in meters
+
+        Returns:
+            True if within boundary, False otherwise
+        """
+        grid_x = int(position[0] / self.map_resolution) + self.origin_x
+        grid_y = int(position[1] / self.map_resolution) + self.origin_y
+        
+        if 0 <= grid_x < self.grid_size and 0 <= grid_y < self.grid_size:
+            return self.boundary_map[grid_y, grid_x] > 0
+        return False
+    
+    def get_nearby_obstacles(self, position: Tuple[float, float], radius: float) -> np.ndarray:
+        """
+        Get obstacles within a radius of a position
+
+        Args:
+            position: (x, y) position in meters
+            radius: Radius in meters
+
+        Returns:
+            Obstacle map within the radius
+        """
+        grid_x = int(position[0] / self.map_resolution) + self.origin_x
+        grid_y = int(position[1] / self.map_resolution) + self.origin_y
+        radius_cells = int(radius / self.map_resolution)
+        
+        x_min = max(0, grid_x - radius_cells)
+        x_max = min(self.grid_size, grid_x + radius_cells + 1)
+        y_min = max(0, grid_y - radius_cells)
+        y_max = min(self.grid_size, grid_y + radius_cells + 1)
+        
+        return self.obstacle_memory[y_min:y_max, x_min:x_max]
+    
+    def get_nearby_objects(self, position: Tuple[float, float], radius: float) -> List[Dict[str, Any]]:
+        """
+        Get persistent objects within a radius of a position
+
+        Args:
+            position: (x, y) position in meters
+            radius: Radius in meters
+
+        Returns:
+            List of objects within the radius
+        """
+        grid_x = int(position[0] / self.map_resolution) + self.origin_x
+        grid_y = int(position[1] / self.map_resolution) + self.origin_y
+        radius_cells = int(radius / self.map_resolution)
+        
+        nearby_objects = []
+        for obj_id, obj in self.object_map.items():
+            obj_x, obj_y = obj["position"]
+            distance = np.sqrt((obj_x - grid_x)**2 + (obj_y - grid_y)**2)
+            if distance <= radius_cells:
+                obj_copy = obj.copy()
+                obj_copy["id"] = obj_id
+                # Convert position from grid to meters
+                obj_copy["position_meters"] = (
+                    (obj_x - self.origin_x) * self.map_resolution,
+                    (obj_y - self.origin_y) * self.map_resolution
+                )
+                nearby_objects.append(obj_copy)
+        
+        return nearby_objects
+    
+    def get_full_map(self) -> Dict[str, Any]:
+        """
+        Get a dictionary containing all map layers
+
+        Returns:
+            Dictionary with map layers
+        """
+        return {
+            "obstacle_memory": self.obstacle_memory.tolist(),
+            "boundary_map": self.boundary_map.tolist(),
+            "persistent_objects": self.object_map,
+            "map_resolution": self.map_resolution,
+            "map_size_meters": self.map_size_meters,
+            "origin": (self.origin_x, self.origin_y)
+        }
+    
+    def save_map(self) -> bool:
+        """
+        Save the environmental map to disk
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            os.makedirs(os.path.dirname(self.map_file), exist_ok=True)
+            
+            # Convert map to serializable format
+            map_data = {
+                "obstacle_memory": self.obstacle_memory.tolist(),
+                "boundary_map": self.boundary_map.tolist(),
+                "object_map": {str(k): v for k, v in self.object_map.items()},
+                "next_object_id": self.next_object_id,
+                "map_resolution": self.map_resolution,
+                "map_size_meters": self.map_size_meters,
+                "grid_size": self.grid_size,
+                "origin": (self.origin_x, self.origin_y),
+                "timestamp": time.time()
+            }
+            
+            with open(self.map_file, 'w') as f:
+                json.dump(map_data, f)
+            
+            self.logger.info(f"Environmental map saved to {self.map_file}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error saving environmental map: {e}")
+            return False
+    
+    def load_map(self) -> bool:
+        """
+        Load the environmental map from disk
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not os.path.exists(self.map_file):
+            self.logger.info("No existing environmental map found, starting with blank map")
+            return False
+        
+        try:
+            with open(self.map_file, 'r') as f:
+                map_data = json.load(f)
+            
+            self.obstacle_memory = np.array(map_data["obstacle_memory"], dtype=np.float32)
+            self.boundary_map = np.array(map_data["boundary_map"], dtype=np.uint8)
+            self.object_map = {int(k): v for k, v in map_data["object_map"].items()}
+            self.next_object_id = map_data["next_object_id"]
+            self.map_resolution = map_data["map_resolution"]
+            self.map_size_meters = map_data["map_size_meters"]
+            self.grid_size = map_data["grid_size"]
+            self.origin_x, self.origin_y = map_data["origin"]
+            
+            self.logger.info(f"Environmental map loaded from {self.map_file}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error loading environmental map: {e}")
+            return False
 
 
 class HailoObjectDetector:
@@ -80,6 +472,10 @@ class HailoObjectDetector:
         self.inference_times = []
         self.avg_inference_time = 0
         self.fps = 0
+        
+        # For visualization
+        self.last_processed_frame = None
+        self.visualization_enabled = config.get("visualization", {}).get("enabled", True)
         
         # Initialize Hailo NPU if available
         if HAILO_AVAILABLE:
@@ -218,6 +614,11 @@ class HailoObjectDetector:
         self.avg_inference_time = sum(self.inference_times) / len(self.inference_times)
         self.fps = 1.0 / self.avg_inference_time if self.avg_inference_time > 0 else 0
         
+        # Visualize detections if enabled
+        if self.visualization_enabled:
+            visualization = self._visualize_detections(frame.copy(), detections)
+            self.last_processed_frame = visualization
+        
         return detections
     
     def _preprocess_frame(self, frame: np.ndarray) -> np.ndarray:
@@ -285,7 +686,7 @@ class HailoObjectDetector:
             
             # Get the class with highest probability
             class_id = np.argmax(class_probs[i])
-            class_name = COCO_CLASSES[class_id]
+            class_name = COCO_CLASSES[class_id] if class_id < len(COCO_CLASSES) else f"class_{class_id}"
             
             # Filter by class if specified
             if self.class_filter and class_name not in self.class_filter:
@@ -313,6 +714,59 @@ class HailoObjectDetector:
         
         return detections
     
+    def _visualize_detections(self, frame: np.ndarray, detections: List[Dict[str, Any]]) -> np.ndarray:
+        """
+        Visualize detections on the frame
+        
+        Args:
+            frame: Input frame
+            detections: List of detection dictionaries
+        
+        Returns:
+            Frame with visualized detections
+        """
+        # Color mapping for different detection types
+        colors = {
+            "normal": (0, 255, 0),        # Green for regular objects
+            "obstacle": (0, 165, 255),    # Orange for obstacles
+            "critical": (0, 0, 255)       # Red for safety-critical objects
+        }
+        
+        # Add detection boxes and labels
+        for detection in detections:
+            # Get bounding box coordinates
+            x1, y1, x2, y2 = detection["bbox"]
+            
+            # Determine color based on detection type
+            if detection.get("is_safety_critical", False):
+                color = colors["critical"]
+            elif detection.get("is_obstacle", False):
+                color = colors["obstacle"]
+            else:
+                color = colors["normal"]
+            
+            # Draw bounding box
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+            
+            # Create label with class name and confidence
+            class_name = detection["class"]
+            confidence = detection["confidence"]
+            label = f"{class_name}: {confidence:.2f}"
+            
+            # Draw label background
+            text_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            cv2.rectangle(frame, (x1, y1 - 20), (x1 + text_size[0], y1), color, -1)
+            
+            # Draw label text
+            cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        
+        # Add performance info
+        if self.fps > 0:
+            fps_info = f"FPS: {self.fps:.1f}"
+            cv2.putText(frame, fps_info, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+        
+        return frame
+    
     def get_latest_detections(self) -> List[Dict[str, Any]]:
         """
         Get the latest object detections
@@ -331,6 +785,15 @@ class HailoObjectDetector:
             frame: New video frame
         """
         self.latest_frame = frame
+    
+    def get_visualization_frame(self) -> Optional[np.ndarray]:
+        """
+        Get the most recently visualized frame with detections
+        
+        Returns:
+            Frame with detection visualizations, or None if not available
+        """
+        return self.last_processed_frame
     
     def get_performance_stats(self) -> Dict[str, float]:
         """
@@ -682,6 +1145,17 @@ class ObstacleDetectionSystem:
             "obstacle_count": len(self.latest_obstacles),
             "performance": self.detector.get_performance_stats() if self.detector else {}
         }
+    
+    def get_visualization_frame(self) -> Optional[np.ndarray]:
+        """
+        Get the most recently visualized frame with detections
+        
+        Returns:
+            Frame with detection visualizations, or None if not available
+        """
+        if self.detector:
+            return self.detector.get_visualization_frame()
+        return None
     
     def cleanup(self) -> None:
         """Clean up resources when shutting down"""
