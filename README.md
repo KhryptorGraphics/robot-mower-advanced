@@ -1,3 +1,6 @@
+*** UNDER DEVELOPMENT
+anyone that wants to participate totes can
+
 # Robot Mower Advanced
 
 An advanced robotic lawn mower platform with SLAM mapping, computer vision, path planning, and remote control capabilities. This open-source project provides a comprehensive solution for building and operating an autonomous lawn mower with sophisticated features typically found in high-end commercial systems.
