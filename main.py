@@ -249,6 +249,9 @@ def initialize_system(config: Dict[str, Any], args) -> Dict[str, Any]:
         # Import navigation components
         from navigation.path_planning import PathPlanner, PathPlanningConfig, MowingPattern
         
+        # Import perception components
+        from perception.hailo_integration import ObstacleDetectionSystem
+        
         # Create sensor instances
         # In simulation mode, sensors will use mock data
         if not simulation_mode:
@@ -265,6 +268,20 @@ def initialize_system(config: Dict[str, Any], args) -> Dict[str, Any]:
                 
                 imu_sensor = MPU6050IMUSensor(config)
                 components['imu_sensor'] = imu_sensor
+                
+                # Initialize Hailo NPU-based obstacle detection if enabled
+                hailo_enabled = config.get('hailo', {}).get('enabled', False)
+                if hailo_enabled:
+                    try:
+                        logger.info("Initializing Hailo NPU-based obstacle detection...")
+                        obstacle_system = ObstacleDetectionSystem(config)
+                        if obstacle_system.initialized:
+                            components['obstacle_detection'] = obstacle_system
+                            logger.info("Hailo NPU obstacle detection initialized successfully")
+                        else:
+                            logger.warning("Hailo NPU obstacle detection failed to initialize")
+                    except Exception as e:
+                        logger.error(f"Error initializing Hailo NPU obstacle detection: {e}")
                 
                 logger.info("Hardware components initialized successfully")
             except Exception as e:
@@ -341,15 +358,41 @@ def main():
     # Main loop
     try:
         while running:
-            # Main system logic would go here
-            # For now, just sleep and log
-            time.sleep(1)
-            
-            # TODO: Implement main control loop logic
-            # - Check sensors
-            # - Update navigation
-            # - Control motors
-            # - etc.
+            # Perform system updates
+            try:
+                # Check for obstacles using Hailo NPU-based detection if available
+                if 'obstacle_detection' in components and components['obstacle_detection'].initialized:
+                    obstacle_system = components['obstacle_detection']
+                    
+                    # Start the detection system if not already running
+                    if not obstacle_system.running:
+                        obstacle_system.start()
+                    
+                    # Check for obstacles
+                    if obstacle_system.is_emergency_stop_required():
+                        logger.warning("EMERGENCY STOP: Safety critical obstacle detected!")
+                        # Implement emergency stop here
+                        # motors.emergency_stop()
+                        
+                    elif not obstacle_system.is_path_clear():
+                        closest_distance = obstacle_system.get_closest_obstacle_distance()
+                        logger.info(f"Obstacle detected at {closest_distance:.2f} meters, taking avoidance action")
+                        # Implement obstacle avoidance here
+                        # navigation.avoid_obstacle()
+                        
+                    # Get obstacle info for logging/debugging
+                    obstacles = obstacle_system.get_obstacle_info()
+                    if obstacles:
+                        logger.debug(f"Detected {len(obstacles)} obstacles")
+                
+                # Regular sensor checks and navigation updates
+                # ...
+                
+                # Sleep a short time to prevent CPU hogging
+                time.sleep(0.1)
+            except Exception as e:
+                logger.error(f"Error in main loop processing: {e}")
+                time.sleep(1)  # Sleep longer on error
             
     except Exception as e:
         logger.error(f"Error in main loop: {e}")
@@ -362,6 +405,7 @@ def main():
         for name, component in components.items():
             if hasattr(component, 'cleanup'):
                 try:
+                    logger.info(f"Cleaning up {name}...")
                     component.cleanup()
                 except Exception as e:
                     logger.error(f"Error cleaning up {name}: {e}")

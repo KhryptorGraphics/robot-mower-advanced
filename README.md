@@ -46,7 +46,7 @@ The architecture follows a modular design with clear separation of concerns:
 - **Multi-Zone Management**: Define and manage multiple lawn zones with different mowing patterns
 - **Edge Detection and Following**: Precisely mow along the edges of the lawn for a clean finish
 - **Advanced Navigation**: Multiple mowing patterns including parallel, spiral, zigzag, and perimeter-first
-- **Object Detection**: Identify and avoid obstacles with special attention to safety-critical objects
+- **Object Detection with Hailo NPU**: High-performance obstacle detection and avoidance using the Hailo NPU hardware accelerator for real-time neural network inference
 - **Lawn Health Analysis**: Monitor lawn health and get recommendations for improvements
 - **Grass Growth Prediction**: Smart scheduling based on predicted grass growth rates
 - **Weather-Based Scheduling**: Automatically adjust mowing schedule based on weather forecasts
@@ -99,11 +99,13 @@ For detailed manual installation instructions, see [SETUP.md](SETUP.md).
 
 ### Computing Platform
 - **Primary Controller**: Raspberry Pi 4B+ with 4GB RAM (8GB for optimal performance)
+- **AI Accelerator**: Hailo-8 NPU HAT for hardware-accelerated object detection
 - **Storage**: 32GB+ Class 10 microSD card or USB SSD for improved reliability
 - **Power Management**: UPS HAT for safe shutdown during low power
 - **Connectivity**: Raspberry Pi with built-in Wi-Fi or external Wi-Fi adapter with antenna
 
 ### Sensor Suite (Minimally Required)
+- **Vision**: Raspberry Pi Camera V2 or HQ Camera for object detection with Hailo NPU
 - **Distance Sensing**: At least 3× HC-SR04 ultrasonic sensors for basic obstacle detection
 - **Orientation**: MPU6050 or MPU9250 IMU for orientation and tilt detection
 - **Positioning**: GPS module (NEO-6M or NEO-M8N) for location tracking

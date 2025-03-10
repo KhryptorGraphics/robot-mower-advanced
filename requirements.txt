@@ -29,6 +29,15 @@ shapely>=1.8.0
 requests>=2.27.0
 paho-mqtt>=1.6.0
 
+# Computer vision and object detection
+# Note: hailo-ai is installed separately by the installation script
+opencv-python-headless>=4.6.0  # Main OpenCV package
+opencv-contrib-python>=4.6.0   # Additional OpenCV modules
+numpy>=1.22.0                 # Required for array operations
+pillow>=9.0.0                 # Image processing
+scipy>=1.8.0                  # Scientific computing
+ipython>=8.3.0                # Interactive Python shell for debugging
+
 # Documentation
 Sphinx>=4.5.0
 
