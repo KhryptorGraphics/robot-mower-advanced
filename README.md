@@ -252,6 +252,8 @@ These components communicate over your local network using a secure protocol, wi
 
 This guide provides step-by-step instructions for installing the Robot Mower Advanced system on both the Raspberry Pi (mower controller) and Ubuntu Server (control panel).
 
+**For detailed hardware construction and wiring instructions, see the [Comprehensive Hardware Guide](hardware_guide.md)**
+
 ### Raspberry Pi Installation (Mower Controller)
 
 #### 1. Hardware Assembly
