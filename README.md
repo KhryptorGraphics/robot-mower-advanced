@@ -112,72 +112,388 @@ These components communicate over your local network using a secure protocol, wi
 
 ## Hardware Requirements
 
-### Raspberry Pi Setup
+### Detailed Hardware List with Model Numbers
+
+#### Raspberry Pi Setup
 
 - **Compute Platform**:
-  - Raspberry Pi 4 (4GB+ RAM recommended)
-  - 32GB+ microSD card (high endurance recommended)
-  - Cooling case or heatsinks
+  - **Raspberry Pi 4 Model B** (8GB RAM recommended, 4GB minimum) - [Raspberry Pi 4 Model B](https://www.raspberrypi.com/products/raspberry-pi-4-model-b/)
+  - **32GB+ SanDisk Extreme Pro microSD card** (high endurance for prolonged logging)
+  - **Raspberry Pi PoE HAT** or **Argon ONE M.2 Case** with cooling fan
 
 - **Sensors**:
-  - 4-6× Ultrasonic sensors (HC-SR04 or similar) for obstacle detection
-  - IMU sensor (MPU6050 or similar) for orientation and tilt detection
-  - Wheel encoders for odometry
-  - Camera module (Raspberry Pi Camera v2 or better)
-  - Optional: GPS module (with RTK support for enhanced precision)
-  - Optional: Time-of-Flight (ToF) distance sensors for improved accuracy
+  - **Ultrasonic Sensors**: 6× HC-SR04 or 4× MaxBotix MB1240 (superior performance)
+    - Front: 2× sensors (HC-SR04P or MaxBotix MB1240)
+    - Sides: 2× sensors (HC-SR04P or MaxBotix MB1240)
+    - Rear: 2× sensors (HC-SR04P or MaxBotix MB1240)
+  
+  - **IMU Sensor**: MPU-6050 or MPU-9250 (9-axis IMU recommended)
+    - MPU-9250 preferred for Magnetometer functionality
+    - Alternative: BNO055 for built-in sensor fusion
+  
+  - **Wheel Encoders**: 
+    - LM393 Speed Sensor (2× units) or
+    - AS5048A Magnetic Rotary Encoder (higher precision)
+  
+  - **Camera Module**: 
+    - Raspberry Pi Camera Module 3 Wide (preferred)
+    - Alternative: Raspberry Pi HQ Camera with 6mm Wide Angle Lens
+  
+  - **GPS Module**:
+    - Standard: NEO-6M GPS Module
+    - High Precision: NEO-M8P RTK GPS Module (centimeter precision)
+    - Professional: Emlid Reach M2 RTK GPS (survey-grade)
+  
+  - **Optional Sensors**:
+    - **ToF Sensors**: 3× VL53L1X Time-of-Flight sensors
+    - **Rain Sensor**: YL-83 or FC-37 Rain Detection Module
+    - **Tilt Sensor**: ADXL345 Accelerometer
+    - **Grass Height Sensor**: ToF VL53L0X with custom mount
 
 - **Motor Control**:
-  - Motor controller board (L298N or similar for small mowers)
-  - Alternatively: Robust MOSFET-based H-bridges for larger mowers
-  - PWM control for speed regulation
-  - Current sensing for motor monitoring
+  - For Small Mowers:
+    - **Motor Driver**: L298N Dual H-Bridge Motor Driver (up to 2A per channel)
+    - Alternative: TB6612FNG Dual Motor Driver (better efficiency than L298N)
+  
+  - For Medium Mowers:
+    - **Motor Driver**: Cytron 13A DC Motor Driver (MDD10A or MD13S)
+    - Alternative: Pololu Dual G2 High-Power Motor Driver 18v18 or 24v13
+  
+  - For Large/Heavy Mowers:
+    - **Motor Driver**: Sabertooth 2X32 or RoboClaw 2x30A Motor Controller
+    - Alternative: ODrive v3.6 for brushless motor control
+  
+  - **Cutting Motor Control**:
+    - BTS7960 43A High-Power Motor Driver for blade motor
+    - Alternative: MOSFET IRF3205 with suitable gate driver
 
 - **Power System**:
-  - 12V/24V battery system (LiFePO4 recommended for longer life)
-  - DC-DC converter for Raspberry Pi power supply
-  - Power monitoring circuit
-  - Charging dock contacts (if implementing automated charging)
+  - **Battery**:
+    - **LiFePO4**: 4S 12.8V 20Ah battery pack (longer life, safer chemistry)
+    - Alternative: 6S or 7S Li-ion 24V battery for higher power systems
+    - Recommended Brands: RB/GBS/LiitoKala for LiFePO4, LiitoKala for Li-ion
+  
+  - **Power Management**:
+    - DC-DC Converter: LM2596 based buck converter (3A version)
+    - High-Current Version: DROK Buck Converter 8A or XL4016 DC-DC Converter
+    - Power Monitoring: INA219 Current/Voltage Sensor
+  
+  - **Charging**:
+    - TP4056 Li-ion Charging Boards (for small systems)
+    - Robust Solution: Battery Management System (BMS) for 4S or 6S battery
+    - Charging Contacts: 2× Spring-loaded Pogo Pins (gold-plated)
 
 - **Additional Hardware**:
-  - Rain sensor
-  - Emergency stop button
-  - Status LEDs and/or small display
-  - 3D-printed or custom-built enclosure for electronics
-  - Optional: Hailo NPU for accelerated computer vision
+  - **Emergency Stop**: Red Mushroom E-Stop Button with NC contacts
+  - **Status Display**: 0.96" OLED I2C Display (SSD1306 controller)
+  - **Indicators**: 5× 5mm RGB LEDs for status indication
+  - **Buttons/Switches**: 3× Waterproof Momentary Push Buttons
+  - **Enclosure**: IP65 Rated ABS Enclosure (200×120×75mm minimum)
+  - **Optional NPU**: Hailo-8 or Hailo-8L NPU for AI acceleration
+  - **Wiring/Connectors**: 
+    - JST connectors for sensors
+    - XT60/XT90 connectors for power
+    - Waterproof M12 connectors for external connections
 
-### Control Panel Server Setup
+#### Control Panel Server Setup
 
-- **System Requirements**:
-  - Any Ubuntu-compatible system (18.04 or newer)
-  - Minimum 2GB RAM, recommended 4GB
-  - 10GB+ storage space
-  - Network connection to the Raspberry Pi (Ethernet or WiFi)
-  - Can be a physical machine, VM, or cloud instance
+- **Minimum System Requirements**:
+  - **SBC Option**: Raspberry Pi 4 (4GB) or ODROID-N2+
+  - **Mini PC Option**: Intel NUC (Celeron or better)
+  - **Server Option**: Any Ubuntu-compatible server with 2GB+ RAM
+  - **Storage**: 32GB SSD/eMMC minimum, 120GB SSD recommended
+  - **Network**: Ethernet preferred, WiFi 5 (802.11ac) or better
+  - Recommended Models:
+    - Budget: Raspberry Pi 4 8GB
+    - Mid-range: ODROID-N2+ or Intel NUC7CJYH
+    - Premium: Intel NUC10i3FNK or Dell Optiplex 3060 Micro
 
 - **Network Requirements**:
-  - Local network with the mower (for direct control)
-  - Internet connection (optional, for weather data)
-  - Static IP recommended or proper DNS setup
-  - Firewall configuration to allow access to Control Panel port (7799)
+  - **Router**: Any modern router with VPN capability
+  - **For Remote Access**: Port forwarding capability or VPN
+  - **Optional**: TP-Link Omada or Ubiquiti UniFi access points for better coverage
+  - **For Large Areas**: Outdoor wireless AP with directional antenna
 
-### Optional Components
+### Optional Components with Recommended Models
 
 - **Docking Station**:
-  - Charging contacts compatible with the mower
-  - Weather protection
-  - Guide markers for precise docking
+  - **Charging Contacts**: 2× Gold-plated Spring Contacts (200mA minimum)
+  - **Guidance System**:
+    - Visual: ArUco Markers (600×600mm, weatherproof print)
+    - Alternative: 4× IR Beacons (TSOP38238 IR Receiver based)
+  - **Weather Protection**: IP65 Rated Enclosure with Rain Cover
+  - **Power Supply**: 24V 5A Power Supply with IP67 Rating
 
 - **Boundary Markers**:
-  - Physical markers for SLAM alignment
-  - QR codes or ArUco markers for vision-based localization
-  - Optional: Boundary wire system for traditional boundaries
+  - **Visual Markers**: 
+    - Weatherproof ArUco Markers (15x15cm printed on Coroplast)
+    - QR Code Markers (laminated, 10×10cm minimum)
+  - **RFID Markers**: 
+    - 125KHz RFID Tags with ID-12LA RFID Reader
+  - **Boundary Wire (optional)**:
+    - 2.5mm² Copper Wire, PVC Insulated
+    - Underground Installation: Use 1.5mm² for ease of installation
 
 - **Advanced Add-ons**:
-  - Lawn quality sensors (soil moisture, etc.)
-  - RTK base station for cm-level GPS precision
-  - Additional cameras for better coverage
-  - Weather station integration
+  - **Lawn Quality Sensors**:
+    - Soil Moisture: Capacitive Soil Moisture Sensor v1.2
+    - Soil Temperature: DS18B20 Waterproof Temperature Sensor
+  - **RTK Base Station**:
+    - DIY: Raspberry Pi Zero 2 W with NEO-M8P GNSS
+    - Commercial: Emlid Reach RS+ or Reach RS2
+  - **Additional Cameras**:
+    - Forward-looking: Raspberry Pi Camera Module 3
+    - Downward-facing: OV5647 Camera Module (low-cost)
+  - **Weather Station Integration**:
+    - DIY: BME280 Temperature/Humidity/Pressure Sensor
+    - Commercial: Ambient Weather WS-2902C Integration
+
+## Detailed Installation Guide
+
+This guide provides step-by-step instructions for installing the Robot Mower Advanced system on both the Raspberry Pi (mower controller) and Ubuntu Server (control panel).
+
+### Raspberry Pi Installation (Mower Controller)
+
+#### 1. Hardware Assembly
+
+1. **Prepare the Enclosure**:
+   - Install the Raspberry Pi in an IP65-rated enclosure
+   - Mount the cooling fan and ensure proper ventilation
+   - Install the emergency stop button in an easily accessible location
+
+2. **Connect Sensors**:
+   - **Ultrasonic Sensors** (HC-SR04):
+     - Connect VCC to 5V power supply
+     - Connect GND to ground
+     - Connect TRIG pins to GPIO pins as configured in `config/local_config.yaml`
+     - Connect ECHO pins through a voltage divider (two resistors: 1kΩ and 2kΩ) to GPIO pins
+
+   - **IMU Sensor** (MPU6050):
+     - Connect VCC to 3.3V power supply
+     - Connect GND to ground
+     - Connect SCL to GPIO3 (I2C1 SCL)
+     - Connect SDA to GPIO2 (I2C1 SDA)
+
+   - **Wheel Encoders**:
+     - Connect VCC to 5V power supply
+     - Connect GND to ground
+     - Connect signal pins to GPIO pins as configured
+
+   - **Camera Module**:
+     - Connect the camera to the CSI connector on the Raspberry Pi
+     - Secure the ribbon cable with the connector latch
+
+3. **Motor Controller Setup**:
+   - **L298N Motor Driver** (for both drive motors):
+     - Connect motor power supply (VCC) to battery power (12-24V)
+     - Connect logic power supply to 5V (or use 5V from driver if available)
+     - Connect IN1, IN2, IN3, IN4 to GPIO pins as configured
+     - Connect ENA and ENB to PWM-capable GPIO pins
+     - Connect motor outputs to DC motors
+
+   - **Cutting Motor Control**:
+     - For high-power motors, use a separate BTS7960 or MOSFET controller
+     - Connect to appropriately rated GPIO pins through optocouplers for isolation
+
+4. **Power Management**:
+   - Install DC-DC converter to regulate battery voltage to 5V for Raspberry Pi
+   - Connect INA219 current sensor in-line with power supply to monitor consumption
+   - Wire emergency stop button to interrupt motor controllers
+
+#### 2. Software Installation
+
+1. **Prepare the Raspberry Pi**:
+   ```bash
+   # Flash Raspberry Pi OS Bullseye (64-bit recommended) to SD card using Raspberry Pi Imager
+   # Boot and perform initial setup
+   # Enable required interfaces:
+   sudo raspi-config
+   # Select: Interface Options > Camera > Enable
+   # Select: Interface Options > I2C > Enable
+   # Select: Interface Options > SPI > Enable
+   
+   # Update the system
+   sudo apt update && sudo apt upgrade -y
+   
+   # Install required packages
+   sudo apt install -y git python3-pip python3-venv
+   ```
+
+2. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/khryptorgraphics/robot-mower-advanced.git
+   cd robot-mower-advanced
+   ```
+
+3. **Run the Installation Script**:
+   ```bash
+   # Make installation script executable
+   chmod +x scripts/install_raspberry_pi.sh
+   
+   # Run the installation script
+   sudo ./scripts/install_raspberry_pi.sh
+   ```
+
+4. **Post-Installation Configuration**:
+   - Edit the configuration file to match your hardware setup:
+   ```bash
+   # Edit configuration with nano editor
+   nano config/local_config.yaml
+   
+   # Adjust GPIO pin assignments to match your wiring
+   # Configure motor parameters
+   # Set up sensor calibration values
+   ```
+
+   - Test the sensor connections:
+   ```bash
+   # Navigate to the project directory
+   cd ~/robot-mower-advanced
+   
+   # Run the sensor test utility
+   python3 utils/test_sensors.py
+   ```
+
+5. **Start the System**:
+   ```bash
+   # Start the system manually for testing
+   cd ~/robot-mower-advanced
+   ./start.sh
+   
+   # Or, enable the systemd service for automatic startup
+   sudo systemctl enable robot-mower.service
+   sudo systemctl start robot-mower.service
+   ```
+
+### Ubuntu Server Installation (Control Panel)
+
+#### 1. Hardware Setup
+
+1. **Prepare the Server**:
+   - Install Ubuntu Server 20.04 LTS or newer on your chosen hardware
+   - Ensure the system has a static IP address on your local network
+   - Open port 7799 in the firewall for the web interface
+
+2. **Network Configuration**:
+   ```bash
+   # Update the system
+   sudo apt update && sudo apt upgrade -y
+   
+   # Install required packages
+   sudo apt install -y git python3-pip python3-venv nginx
+   
+   # Configure firewall
+   sudo ufw allow 7799/tcp
+   sudo ufw enable
+   ```
+
+#### 2. Software Installation
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/khryptorgraphics/robot-mower-advanced.git
+   cd robot-mower-advanced
+   ```
+
+2. **Run the Installation Script**:
+   ```bash
+   # Make installation script executable
+   chmod +x scripts/install_ubuntu_server.sh
+   
+   # Run the installation script
+   sudo ./scripts/install_ubuntu_server.sh
+   ```
+
+3. **Configuration**:
+   - Edit the configuration file to set up the control panel:
+   ```bash
+   # Edit configuration
+   nano config/local_config.yaml
+   
+   # Set the mower's IP address
+   # Configure authentication
+   # Adjust web interface settings
+   ```
+
+4. **Start the Control Panel**:
+   ```bash
+   # Start the service
+   sudo systemctl start robot-mower-web.service
+   
+   # Enable automatic startup
+   sudo systemctl enable robot-mower-web.service
+   ```
+
+5. **Access the Web Interface**:
+   - Open a web browser and navigate to `http://[server-ip]:7799`
+   - Log in with the default credentials:
+     - Username: `admin`
+     - Password: `admin`
+   - Change the default password immediately after first login
+
+### Connecting the Systems
+
+1. **Network Configuration**:
+   - Ensure both systems are on the same local network
+   - Configure the Raspberry Pi to connect to your WiFi network:
+   ```bash
+   sudo raspi-config
+   # Select: System Options > Wireless LAN
+   # Enter your WiFi SSID and password
+   ```
+
+2. **Security Setup** (optional but recommended):
+   - Generate and install SSL certificates for secure communication:
+   ```bash
+   # On the Ubuntu Server
+   cd ~/robot-mower-advanced
+   sudo ./scripts/generate_ssl_cert.sh
+   ```
+
+3. **Testing Communication**:
+   - From the Ubuntu server, test connectivity to the Raspberry Pi:
+   ```bash
+   ping [raspberry-pi-ip]
+   ```
+   
+   - Test the API connection:
+   ```bash
+   curl http://[raspberry-pi-ip]:5000/api/status
+   ```
+
+4. **Final Configuration**:
+   - In the web interface, navigate to Settings > Connection
+   - Enter the Raspberry Pi's IP address
+   - Click "Test Connection" to verify
+   - Save the configuration
+
+### Troubleshooting Hardware Issues
+
+#### Common GPIO Issues
+
+- **Ultrasonic Sensors Not Responding**:
+  - Verify 5V power is reaching the sensors (measure with multimeter)
+  - Check GPIO pin assignments in configuration
+  - Ensure voltage dividers are installed for ECHO pins
+  - Test each sensor individually using the test script
+
+- **Motor Control Problems**:
+  - Verify PWM frequency configuration (1-5kHz recommended)
+  - Check for sufficient power supply current capacity
+  - Measure motor controller logic inputs with multimeter
+  - Isolate motor power from Raspberry Pi power to prevent interference
+
+- **IMU Sensor Issues**:
+  - Run `sudo i2cdetect -y 1` to verify I2C connection
+  - Check I2C address configuration (0x68 is default for MPU6050)
+  - Keep I2C cables short and away from power cables
+  - Run calibration utility: `python3 utils/calibrate_imu.py`
+
+- **Camera Problems**:
+  - Verify camera enabled in `raspi-config`
+  - Check ribbon cable connection (blue side faces away from ethernet port)
+  - Test camera with: `libcamera-still -o test.jpg`
+  - Ensure adequate lighting for vision functions
 
 ## Installation
 
