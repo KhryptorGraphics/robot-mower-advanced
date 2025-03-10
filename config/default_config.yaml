@@ -1,267 +1,169 @@
 # Robot Mower Advanced Default Configuration
+# This file contains default configuration values for the robot mower system
 
-# System configuration
 system:
-  app_name: "RobotMower"
-  data_dir: "data"
-  log_level: "INFO"
+  # Logging configuration
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
   log_file: "logs/robot_mower.log"
-  simulation_mode: false
+  
+  # System behavior
+  units: "metric"  # metric or imperial
+  timezone: "UTC"
+  save_state_interval: 300  # Save state every 5 minutes
 
-# Hardware configuration
 hardware:
-  # Motor controller settings
-  motor_controller:
-    type: "pwm"  # 'pwm' or other controller types
-    left_motor:
-      pwm_pin: 12
-      dir_pin: 16
-      encoder_pin_a: 23
-      encoder_pin_b: 24
-      reverse_direction: false
-      pid:
-        p: 0.5
-        i: 0.1
-        d: 0.05
-        max_i: 100.0
-    right_motor:
-      pwm_pin: 13
-      dir_pin: 20
-      encoder_pin_a: 25
-      encoder_pin_b: 26
-      reverse_direction: false
-      pid:
-        p: 0.5
-        i: 0.1
-        d: 0.05
-        max_i: 100.0
-
-  # Blade motor settings
-  blade_motor:
-    type: "rpi"  # 'rpi' or 'pwm'
-    pwm_pin: 18
-    dir_pin: 22
-    speed: 0.8  # Default speed (0.0-1.0)
-    height_control:
-      servo_pin: 27
-      min_height_mm: 20
-      max_height_mm: 80
-      default_height_mm: 35
-
-  # Battery/power settings
-  battery:
-    monitor_pin: 4  # ADC pin for voltage monitoring
-    voltage_factor: 10.0  # Voltage divider factor
-    low_voltage_threshold: 11.0  # Volts
-    critical_voltage_threshold: 10.5  # Volts
-    max_runtime_hours: 4.0  # Maximum runtime on full charge
-
-  # Sensors
+  # Mower hardware configuration
+  mower_width: 0.28  # Width of the mower blade in meters
+  wheel_diameter: 0.2  # Wheel diameter in meters
+  wheel_base: 0.35  # Distance between wheels in meters
+  max_speed: 0.5  # Maximum speed in m/s
+  max_turn_rate: 45  # Maximum turn rate in degrees/s
+  
+  # Motor configuration
+  motors:
+    left_motor_pins: [17, 18]  # GPIO pins for left motor control
+    right_motor_pins: [22, 23]  # GPIO pins for right motor control
+    pwm_frequency: 1000  # PWM frequency in Hz
+    reverse_left: false  # Reverse left motor direction
+    reverse_right: false  # Reverse right motor direction
+    
+  # Sensor configuration
   sensors:
-    # Ultrasonic distance sensors
     ultrasonic:
-      - name: "front"
-        trigger_pin: 5
-        echo_pin: 6
-        max_distance_m: 4.0
-        orientation_deg: 0  # Front-facing
-      - name: "left"
-        trigger_pin: 17
-        echo_pin: 27
-        max_distance_m: 2.0
-        orientation_deg: 270  # Left side
-      - name: "right"
-        trigger_pin: 22
-        echo_pin: 23
-        max_distance_m: 2.0
-        orientation_deg: 90  # Right side
-
-    # IMU sensor (MPU6050)
+      trigger_pin: 24
+      echo_pin: 25
+      timeout: 1.0  # Timeout in seconds
+      max_distance: 4.0  # Maximum detection distance in meters
+    
     imu:
       i2c_bus: 1
       i2c_address: 0x68
-      orientation_correction:
-        roll_offset_deg: 0.0
-        pitch_offset_deg: 0.0
-        yaw_offset_deg: 0.0
+      calibration_samples: 100
+      
+    rain:
+      pin: 27
+      threshold: 500
+      
+    current:
+      pin: 0  # ADC pin
+      threshold: 2.0  # Overcurrent threshold in amps
+      
+    voltage:
+      pin: 1  # ADC pin
+      low_threshold: 10.5  # Low voltage threshold in volts
+      
+  # Actuator configuration
+  actuators:
+    mower_motor:
+      enable_pin: 12
+      speed_pin: 13
+      pwm_frequency: 1000  # PWM frequency in Hz
+      
+    blade_height:
+      servo_pin: 16
+      min_angle: 0
+      max_angle: 180
+      default_angle: 90
 
-    # GPS sensor
-    gps:
-      port: "/dev/ttyAMA0"
-      baud_rate: 9600
-      update_rate_hz: 1.0
-      min_satellites: 4
-
-    # Camera
-    camera:
-      resolution:
-        width: 640
-        height: 480
-      framerate: 15
-      rotation_deg: 0
-      enable_preview: false
-
-    # Rain sensor
-    rain_sensor:
-      pin: 16
-      type: "digital"  # 'digital' or 'analog'
-      threshold: 500  # For analog sensors
-
-    # Tilt sensor
-    tilt_sensor:
-      use_imu: true  # Use IMU for tilt sensing instead of dedicated sensor
-      pin: 26  # Only used if use_imu is false
-      max_tilt_deg: 25.0  # Maximum safe tilt angle
-
-# Navigation settings
 navigation:
-  # Edge following
-  edge_following:
-    speed: 0.4  # Movement speed during edge following (0.0-1.0)
-    distance: 0.15  # Target distance from edge in meters
-    correction_factor: 1.2  # Steering correction strength
-    max_correction: 0.7  # Maximum steering correction
-    min_distance: 0.05  # Minimum detectable edge distance
-    max_distance: 0.5  # Maximum detectable edge distance
-    completion_threshold: 0.2  # Distance to consider edge complete
-    lost_edge_threshold: 3  # Seconds before considering edge lost
-    max_lost_distance: 1.0  # Maximum search distance when edge is lost
-
-  # Obstacle avoidance
-  obstacle_avoidance:
-    enabled: true
-    stop_distance: 0.5  # Distance to stop before obstacle (meters)
-    slow_distance: 1.0  # Distance to slow down (meters)
-    side_clearance: 0.3  # Side clearance (meters)
-    max_detour_distance: 5.0  # Maximum detour distance
-    recovery_attempts: 3  # Max attempts to recover
-
-# Perception settings
-perception:
-  # Object detection
-  object_detection:
-    enabled: true
-    interval: 0.2  # Detection interval in seconds
-    confidence_threshold: 0.5  # Minimum confidence to consider a detection
-    iou_threshold: 0.5  # IoU threshold for non-maximum suppression
-    max_distance: 5.0  # Maximum detection distance in meters
-    safety_radius: 2.0  # Safety radius around mower (meters)
-    child_safety_radius: 4.0  # Safety radius for children (meters)
-    pet_safety_radius: 3.0  # Safety radius for pets (meters)
-    save_detections: true
-    history_limit: 100
-
-  # Lawn health analysis
-  lawn_health:
-    analysis_interval: 3600  # Analysis interval in seconds
-    save_images: true
-    image_save_path: "data/lawn_images"
-    report_save_path: "data/lawn_reports"
-
-# Mowing settings
-mowing:
-  cutting_height: 35  # Default cutting height in mm
-  blade_speed: 0.8  # Default blade speed (0.0-1.0)
-  mowing_speed: 0.5  # Default mowing speed (0.0-1.0)
-  overlap_percent: 10  # Overlap between passes (%)
-  default_pattern: "parallel"  # parallel, spiral, zigzag, random, perimeter_first
-
-# Security settings
-security:
-  theft_protection:
-    enabled: true
-    geofence_enabled: true
-    geofence_radius: 100.0  # Meters
-    geofence_center: null  # Will be set automatically on first use
-    alarm_enabled: true
-    alarm_delay: 30  # Seconds
-    position_update_interval: 60  # Seconds
-    suspicious_movement_threshold: 5.0  # Acceleration threshold (m/s²)
-    email_notifications: false
-    email_recipient: ""
-    email_sender: ""
-    email_smtp_server: ""
-    email_smtp_port: 587
-    email_smtp_username: ""
-    email_smtp_password: ""
-    sms_notifications: false
-    sms_recipient: ""
-    sms_provider_url: ""
-    sms_provider_api_key: ""
-
-# Web interface settings
-web:
-  enabled: true
-  host: "0.0.0.0"
-  port: 8080
-  debug: false
-  enable_https: false
-  cert_file: ""
-  key_file: ""
-  require_login: true
-  session_timeout: 3600  # 1 hour
-  jwt_secret: ""  # Will be generated automatically if empty
-
-# Scheduling settings
-scheduling:
-  weather_based:
-    enabled: true
-    forecast_days: 5
-    update_interval: 3600  # Seconds
-    min_reschedule_notice: 3  # Hours
-    max_reschedule_delay: 48  # Hours
-    rain_delay: 3  # Hours after rain
-    reschedule_medium_impact: true
-    reschedule_low_impact: false
-
-# Maintenance settings
-maintenance:
-  enabled: true
-  update_interval: 60.0  # Seconds
-  notify_overdue: true
-  auto_schedule: false
+  # Navigation configuration
+  mowing_pattern: "adaptive"  # parallel_lines, spiral, perimeter_first, zigzag, adaptive
+  line_direction: 0.0  # Direction for parallel lines (degrees, 0 = East, 90 = North)
+  path_overlap_percent: 10.0  # Percentage of mower width to overlap
+  perimeter_passes: 2  # Number of passes around perimeter
+  obstacle_buffer: 0.3  # Buffer distance around obstacles in meters
+  dock_approach_distance: 2.0  # Distance to switch to precision docking in meters
   
-  # Maintenance intervals (hours)
-  blade_replacement:
-    interval_hours: 50.0
-  filter_cleaning:
-    interval_hours: 20.0
-  general_inspection:
-    interval_hours: 100.0
-  motor_maintenance:
-    interval_hours: 200.0
-  battery_maintenance:
-    interval_cycles: 50
-  software_update:
-    interval_hours: 168.0  # Weekly
-  sensor_cleaning:
-    interval_hours: 50.0
-
-# Weather settings
-weather:
-  api:
+  # GPS configuration (if equipped)
+  gps:
     enabled: false
-    key: ""
-    url: "https://api.openweathermap.org/data/2.5/forecast"
-    provider: "openweathermap"
-  
-  # Weather impact thresholds
-  thresholds:
-    high_precipitation: 5.0  # mm
-    medium_precipitation: 1.0  # mm
-    low_precipitation: 0.2  # mm
-    high_precipitation_probability: 80.0  # %
-    medium_precipitation_probability: 50.0  # %
-    low_precipitation_probability: 30.0  # %
-    high_temperature: 35.0  # °C
-    low_temperature: 0.0  # °C
-    high_wind: 10.0  # m/s
-    medium_wind: 7.0  # m/s
-    low_visibility: 1000.0  # meters
+    serial_port: "/dev/ttyAMA0"
+    baud_rate: 9600
+    precision_threshold: 2.0  # GPS precision threshold in meters
+    
+  # Compass configuration
+  compass:
+    enabled: true
+    declination: 0.0  # Magnetic declination for your location
+    calibration:
+      x_offset: 0
+      y_offset: 0
+      z_offset: 0
 
-# Location settings (will be set on first use if GPS is available)
-location:
-  latitude: 0.0
-  longitude: 0.0
-  city: "Unknown"
-  country: "Unknown"
+lawn:
+  # Lawn and boundary configuration
+  boundary:
+    # List of coordinates defining the lawn boundary
+    # Format: [lat, lon] or [x, y] depending on coordinate system
+    coordinates: []
+    
+  # No-mow zones (obstacles)
+  no_mow_zones: []
+  
+  # Dock location
+  dock:
+    position: [0, 0]  # [lat, lon] or [x, y]
+    orientation: 0  # Degrees, 0 = East, 90 = North
+    
+  # Manually defined mowing zones
+  zones: []
+
+schedule:
+  # Mowing schedule
+  enabled: true
+  max_run_time: 120  # Maximum run time in minutes
+  rain_delay: 360  # Delay after rain in minutes
+  
+  # Scheduled mowing times
+  mowing_times:
+    - day: "monday"
+      start_time: "10:00"
+      duration: 60  # minutes
+    - day: "thursday"
+      start_time: "10:00"
+      duration: 60  # minutes
+
+security:
+  # Security configuration
+  pin_code: "0000"  # Default PIN code for control panel
+  auto_lock: true  # Automatically lock control panel
+  lock_timeout: 300  # Lock after inactivity (seconds)
+  
+  # Emergency contacts
+  emergency_contacts: []
+
+web:
+  # Web interface configuration
+  port: 7799
+  enable_ssl: false
+  ssl_cert: ""
+  ssl_key: ""
+  username: "admin"
+  password: "admin"  # Change this!
+  
+  # MQTT configuration for external communication
+  mqtt:
+    enabled: false
+    broker: "localhost"
+    port: 1883
+    username: ""
+    password: ""
+    topic_prefix: "robot_mower/"
+    
+  # Remote monitoring
+  monitoring:
+    enabled: false
+    update_interval: 60  # Seconds between status updates
+    server_url: ""
+    api_key: ""
+    
+advanced:
+  # Advanced configuration options
+  development_mode: false
+  debug_peripherals: false
+  simulation: false
+  record_data: false
+  data_folder: "data/"
+  backup_folder: "backups/"
+  max_log_size_mb: 10
+  max_log_files: 5

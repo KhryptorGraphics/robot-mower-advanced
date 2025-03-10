@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Mower Advanced - Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" width="30" height="30" class="d-inline-block align-text-top me-2">
+                Robot Mower Advanced
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/zones">Zones</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/schedule">Schedule</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/maintenance">Maintenance</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/settings">Settings</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <span class="navbar-text me-3">
+                        <i class="bi bi-person-fill"></i> {{ user }}
+                    </span>
+                    <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <!-- System Status Card -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">System Status</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="system-status">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Status:</span>
+                                    <span id="mower-status" class="badge bg-success">Idle</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Battery:</span>
+                                    <span id="battery-level">80%</span>
+                                </div>
+                                <div class="progress mb-3" style="height: 10px;">
+                                    <div id="battery-progress" class="progress-bar bg-success" role="progressbar" style="width: 80%;" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Signal:</span>
+                                    <span id="signal-strength">
+                                        <i class="bi bi-reception-4"></i> Strong
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Uptime:</span>
+                                    <span id="uptime">2d 7h 35m</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions Card -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button id="start-mower" class="btn btn-success">
+                                    <i class="bi bi-play-fill"></i> Start Mowing
+                                </button>
+                                <button id="pause-mower" class="btn btn-warning">
+                                    <i class="bi bi-pause-fill"></i> Pause
+                                </button>
+                                <button id="stop-mower" class="btn btn-danger">
+                                    <i class="bi bi-stop-fill"></i> Stop
+                                </button>
+                                <button id="dock-mower" class="btn btn-secondary">
+                                    <i class="bi bi-house-fill"></i> Return to Dock
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Weather Card -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">Weather</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="weather-panel" class="text-center">
+                                <div class="mb-2">
+                                    <i id="weather-icon" class="bi bi-sun fs-1 text-warning"></i>
+                                </div>
+                                <h3 id="weather-temp">22°C</h3>
+                                <p id="weather-condition" class="mb-2">Sunny</p>
+                                <div class="row mt-3 text-center">
+                                    <div class="col-4">
+                                        <div class="small text-muted">Humidity</div>
+                                        <div id="weather-humidity">65%</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="small text-muted">Wind</div>
+                                        <div id="weather-wind">3 km/h</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="small text-muted">Rain</div>
+                                        <div id="weather-rain">0%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content Area -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Dashboard</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary">Share</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary">Export</button>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle">
+                            <span data-feather="calendar"></span>
+                            This Week
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Status Overview -->
+                <div class="row mb-4">
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card text-white bg-primary">
+                            <div class="card-body">
+                                <h5 class="card-title">Current Zone</h5>
+                                <p id="current-zone" class="card-text fs-4">Front Yard</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card text-white bg-success">
+                            <div class="card-body">
+                                <h5 class="card-title">Coverage</h5>
+                                <p id="coverage-percent" class="card-text fs-4">78%</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card text-white bg-info">
+                            <div class="card-body">
+                                <h5 class="card-title">Runtime</h5>
+                                <p id="current-runtime" class="card-text fs-4">01:45:23</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card text-white bg-warning">
+                            <div class="card-body">
+                                <h5 class="card-title">Next Schedule</h5>
+                                <p id="next-schedule" class="card-text fs-4">Tomorrow 10:00</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Lawn Map -->
+                <div class="row mb-4">
+                    <div class="col-md-8 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">Lawn Map & Mowing Progress</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="lawn-map-container" style="position: relative; height: 400px;">
+                                    <canvas id="lawn-map" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+                                    <div id="map-controls" style="position: absolute; top: 10px; right: 10px; z-index: 100;">
+                                        <button id="zoom-in" class="btn btn-sm btn-light"><i class="bi bi-plus-lg"></i></button>
+                                        <button id="zoom-out" class="btn btn-sm btn-light"><i class="bi bi-dash-lg"></i></button>
+                                        <button id="reset-view" class="btn btn-sm btn-light"><i class="bi bi-arrows-fullscreen"></i></button>
+                                    </div>
+                                    <div id="map-legend" style="position: absolute; bottom: 10px; left: 10px; z-index: 100; background-color: rgba(255,255,255,0.8); padding: 5px; border-radius: 5px;">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <div style="width: 15px; height: 15px; background-color: #28a745; margin-right: 5px;"></div>
+                                            <small>Mowed</small>
+                                        </div>
+                                        <div class="d-flex align-items-center mb-1">
+                                            <div style="width: 15px; height: 15px; background-color: #ffc107; margin-right: 5px;"></div>
+                                            <small>Unmowed</small>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <div style="width: 15px; height: 15px; background-color: #dc3545; margin-right: 5px;"></div>
+                                            <small>Obstacles</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">System Health</h5>
+                            </div>
+                            <div class="card-body">
+                                <h6>Battery</h6>
+                                <div class="progress mb-3" style="height: 15px;">
+                                    <div id="system-battery" class="progress-bar bg-success" role="progressbar" style="width: 80%;" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100">80%</div>
+                                </div>
+                                
+                                <h6>CPU Usage</h6>
+                                <div class="progress mb-3" style="height: 15px;">
+                                    <div id="system-cpu" class="progress-bar bg-info" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">25%</div>
+                                </div>
+                                
+                                <h6>Memory Usage</h6>
+                                <div class="progress mb-3" style="height: 15px;">
+                                    <div id="system-memory" class="progress-bar bg-primary" role="progressbar" style="width: 45%;" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100">45%</div>
+                                </div>
+                                
+                                <h6>Disk Space</h6>
+                                <div class="progress mb-3" style="height: 15px;">
+                                    <div id="system-disk" class="progress-bar bg-warning" role="progressbar" style="width: 30%;" aria-valuenow="30" aria-valuemin="0" aria-valuemax="100">30%</div>
+                                </div>
+                                
+                                <h6>Temperature</h6>
+                                <div class="progress mb-3" style="height: 15px;">
+                                    <div id="system-temp" class="progress-bar bg-danger" role="progressbar" style="width: 40%;" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100">40°C</div>
+                                </div>
+                                
+                                <h6>Blade Wear</h6>
+                                <div class="progress mb-4" style="height: 15px;">
+                                    <div id="blade-wear" class="progress-bar bg-secondary" role="progressbar" style="width: 15%;" aria-valuenow="15" aria-valuemin="0" aria-valuemax="100">15%</div>
+                                </div>
+                                
+                                <div class="alert alert-success">
+                                    <i class="bi bi-check-circle-fill"></i> All systems operational
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Runtime & Sensors -->
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">Runtime Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="runtime-chart" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">Sensor Readings</h5>
+                            </div>
+                            <div class="card-body">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sensor</th>
+                                            <th>Value</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Front Distance</td>
+                                            <td>1.2m</td>
+                                            <td><span class="badge bg-success">OK</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Left Distance</td>
+                                            <td>0.8m</td>
+                                            <td><span class="badge bg-success">OK</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Right Distance</td>
+                                            <td>1.5m</td>
+                                            <td><span class="badge bg-success">OK</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>IMU</td>
+                                            <td>Roll: 2°, Pitch: 1°</td>
+                                            <td><span class="badge bg-success">OK</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>GPS</td>
+                                            <td>Satellites: 8</td>
+                                            <td><span class="badge bg-success">OK</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Rain Sensor</td>
+                                            <td>No rain detected</td>
+                                            <td><span class="badge bg-success">OK</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity & Alerts -->
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">Recent Activity</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group">
+                                    <a href="#" class="list-group-item list-group-item-action">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1">Mowing completed</h6>
+                                            <small>3 hours ago</small>
+                                        </div>
+                                        <p class="mb-1">Front yard mowing completed successfully. 98% coverage achieved.</p>
+                                    </a>
+                                    <a href="#" class="list-group-item list-group-item-action">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1">Obstacle detected</h6>
+                                            <small>5 hours ago</small>
+                                        </div>
+                                        <p class="mb-1">Temporary obstacle detected and avoided in the east section.</p>
+                                    </a>
+                                    <a href="#" class="list-group-item list-group-item-action">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1">Battery charged</h6>
+                                            <small>Yesterday</small>
+                                        </div>
+                                        <p class="mb-1">Battery charged to 100%. Charging time: 3h 25m.</p>
+                                    </a>
+                                    <a href="#" class="list-group-item list-group-item-action">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1">System update</h6>
+                                            <small>2 days ago</small>
+                                        </div>
+                                        <p class="mb-1">System updated to version 2.1.4. New features added.</p>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">Alerts & Notifications</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-warning">
+                                    <strong>Maintenance Due:</strong> Blade replacement recommended within 5 hours of operation.
+                                </div>
+                                <div class="alert alert-info">
+                                    <strong>Weather Alert:</strong> Rain forecasted for tomorrow. Mowing schedule adjusted.
+                                </div>
+                                <div class="alert alert-success">
+                                    <strong>Lawn Health:</strong> Analysis shows improvement in lawn health over the past 2 weeks.
+                                </div>
+                                <div class="alert alert-primary">
+                                    <strong>System Update:</strong> New firmware version available. Update recommended.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script>
+        // Initialize WebSocket connection
+        const socket = io();
+        
+        // Socket event handlers
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            socket.emit('get_status');
+        });
+        
+        socket.on('status', (data) => {
+            updateDashboard(data);
+        });
+        
+        // Initialize lawn map
+        function initLawnMap() {
+            const canvas = document.getElementById('lawn-map');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size to match container
+            const container = canvas.parentElement;
+            canvas.width = container.offsetWidth;
+            canvas.height = container.offsetHeight;
+            
+            // Draw lawn boundary
+            ctx.beginPath();
+            ctx.strokeStyle = '#28a745';
+            ctx.lineWidth = 3;
+            ctx.moveTo(50, 50);
+            ctx.lineTo(canvas.width - 50, 50);
+            ctx.lineTo(canvas.width - 50, canvas.height - 50);
+            ctx.lineTo(50, canvas.height - 50);
+            ctx.closePath();
+            ctx.stroke();
+            
+            // Fill with light green (unmowed areas)
+            ctx.fillStyle = '#ffc107';
+            ctx.fill();
+            
+            // Draw mowed areas (progress)
+            ctx.beginPath();
+            ctx.fillStyle = '#28a745';
+            ctx.rect(50, 50, (canvas.width - 100) * 0.78, canvas.height - 100);
+            ctx.fill();
+            
+            // Draw mower position
+            ctx.beginPath();
+            ctx.fillStyle = '#dc3545';
+            ctx.arc(canvas.width / 2, canvas.height / 2, 8, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw mower direction indicator
+            ctx.beginPath();
+            ctx.strokeStyle = '#dc3545';
+            ctx.lineWidth = 2;
+            ctx.moveTo(canvas.width / 2, canvas.height / 2);
+            ctx.lineTo(canvas.width / 2 + 20, canvas.height / 2 - 10);
+            ctx.stroke();
+            
+            // Draw obstacles
+            ctx.fillStyle = '#dc3545';
+            ctx.fillRect(250, 150, 30, 30);
+            ctx.fillRect(400, 300, 25, 25);
+            
+            // Draw no-mow zone
+            ctx.beginPath();
+            ctx.strokeStyle = '#6c757d';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 3]);
+            ctx.ellipse(350, 200, 80, 60, 0, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // Initialize runtime chart
+        function initRuntimeChart() {
+            const ctx = document.getElementById('runtime-chart').getContext('2d');
+            
+            const data = {
+                labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+                datasets: [{
+                    label: 'Runtime Hours',
+                    data: [2.5, 0, 3.2, 0, 2.8, 1.5, 0],
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            };
+            
+            const options = {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Hours'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Daily Runtime (Last Week)'
+                    },
+                    legend: {
+                        display: false
+                    }
+                }
+            };
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: data,
+                options: options
+            });
+        }
+        
+        // Update dashboard with data from server
+        function updateDashboard(data) {
+            console.log('Updating dashboard with data:', data);
+            
+            // Update mower status
+            if (data.mower && data.mower.state) {
+                const statusElement = document.getElementById('mower-status');
+                statusElement.textContent = data.mower.state.charAt(0).toUpperCase() + data.mower.state.slice(1);
+                
+                // Update status color
+                statusElement.className = 'badge';
+                switch (data.mower.state) {
+                    case 'mowing':
+                        statusElement.classList.add('bg-success');
+                        break;
+                    case 'docking':
+                        statusElement.classList.add('bg-info');
+                        break;
+                    case 'error':
+                        statusElement.classList.add('bg-danger');
+                        break;
+                    default:
+                        statusElement.classList.add('bg-secondary');
+                }
+            }
+            
+            // Update battery
+            if (data.power && data.power.battery_level !== undefined) {
+                const batteryLevel = Math.round(data.power.battery_level);
+                document.getElementById('battery-level').textContent = batteryLevel + '%';
+                document.getElementById('system-battery').textContent = batteryLevel + '%';
+                
+                const batteryProgress = document.getElementById('battery-progress');
+                const systemBattery = document.getElementById('system-battery');
+                
+                batteryProgress.style.width = batteryLevel + '%';
+                batteryProgress.setAttribute('aria-valuenow', batteryLevel);
+                
+                systemBattery.style.width = batteryLevel + '%';
+                systemBattery.setAttribute('aria-valuenow', batteryLevel);
+                
+                // Update color based on level
+                const batteryClass = batteryLevel > 50 ? 'bg-success' : 
+                                    batteryLevel > 20 ? 'bg-warning' : 'bg-danger';
+                
+                batteryProgress.className = 'progress-bar ' + batteryClass;
+                systemBattery.className = 'progress-bar ' + batteryClass;
+            }
+            
+            // Update zone
+            if (data.zone && data.zone.current_zone !== undefined) {
+                document.getElementById('current-zone').textContent = data.zone.current_zone || 'None';
+            }
+            
+            // Update progress
+            if (data.mower && data.mower.progress !== undefined) {
+                document.getElementById('coverage-percent').textContent = Math.round(data.mower.progress) + '%';
+            }
+            
+            // Update weather if available
+            if (data.weather) {
+                document.getElementById('weather-condition').textContent = data.weather.condition || 'Unknown';
+                document.getElementById('weather-temp').textContent = data.weather.temperature ? `${data.weather.temperature}°C` : 'Unknown';
+                document.getElementById('weather-humidity').textContent = data.weather.humidity ? `${data.weather.humidity}%` : 'Unknown';
+                document.getElementById('weather-wind').textContent = data.weather.wind_speed ? `${data.weather.wind_speed} km/h` : 'Unknown';
+                document.getElementById('weather-rain').textContent = data.weather.rain_probability ? `${data.weather.rain_probability}%` : '0%';
+                
+                // Update weather icon
+                const weatherIcon = document.getElementById('weather-icon');
+                weatherIcon.className = 'bi fs-1';
+                switch (data.weather.condition) {
+                    case 'clear':
+                        weatherIcon.classList.add('bi-sun', 'text-warning');
+                        break;
+                    case 'cloudy':
+                        weatherIcon.classList.add('bi-cloud', 'text-secondary');
+                        break;
+                    case 'rain':
+                        weatherIcon.classList.add('bi-cloud-rain', 'text-info');
+                        break;
+                    default:
+                        weatherIcon.classList.add('bi-cloud', 'text-secondary');
+                }
+            }
+            
+            // Update system health
+            if (data.system) {
+                if (data.system.cpu_usage !== undefined) {
+                    const cpuElement = document.getElementById('system-cpu');
+                    cpuElement.style.width = data.system.cpu_usage + '%';
+                    cpuElement.textContent = data.system.cpu_usage + '%';
+                    cpuElement.setAttribute('aria-valuenow', data.system.cpu_usage);
+                }
+                
+                if (data.system.memory_usage !== undefined) {
+                    const memElement =

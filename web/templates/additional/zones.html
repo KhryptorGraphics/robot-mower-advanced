@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Mower Advanced - Zone Management</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+    <style>
+        .zone-card {
+            transition: transform 0.2s;
+        }
+        .zone-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ddd;
+            overflow: hidden;
+            background-color: #f8f9fa;
+        }
+        .map-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .zone-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .map-legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 100;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 3px;
+        }
+        .zone-toolbar {
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .pattern-icon {
+            font-size: 1.5rem;
+            margin-right: 5px;
+        }
+        .drag-handle {
+            cursor: move;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" width="30" height="30" class="d-inline-block align-text-top me-2">
+                Robot Mower Advanced
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/zones">Zones</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/schedule">Schedule</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/maintenance">Maintenance</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/settings">Settings</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <span class="navbar-text me-3">
+                        <i class="bi bi-person-fill"></i> {{ user }}
+                    </span>
+                    <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <!-- Zone Actions Card -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">Zone Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button id="add-zone-btn" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addZoneModal">
+                                    <i class="bi bi-plus-circle"></i> Add New Zone
+                                </button>
+                                <button id="edit-zone-btn" class="btn btn-warning">
+                                    <i class="bi bi-pencil-square"></i> Edit Selected Zone
+                                </button>
+                                <button id="delete-zone-btn" class="btn btn-danger">
+                                    <i class="bi bi-trash"></i> Delete Selected Zone
+                                </button>
+                                <hr>
+                                <button id="calibrate-zones-btn" class="btn btn-info">
+                                    <i class="bi bi-bullseye"></i> Calibrate Zones
+                                </button>
+                                <button id="reset-zones-btn" class="btn btn-secondary">
+                                    <i class="bi bi-arrow-clockwise"></i> Reset Zone Map
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Zone Statistics Card -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">Zone Statistics</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>Total Zones:</span>
+                                    <span id="total-zones">4</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>Active Zones:</span>
+                                    <span id="active-zones">3</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>Total Area:</span>
+                                    <span id="total-area">250 m²</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>Last Calibration:</span>
+                                    <span id="last-calibration">3 days ago</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Zone Sequence Card -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">Mowing Sequence</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-2">Drag to reorder zones in mowing sequence</p>
+                            <ul class="list-group" id="zone-sequence">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="drag-handle"><i class="bi bi-grip-vertical"></i></span>
+                                        <span class="badge bg-primary rounded-pill me-2">1</span>
+                                        Front Yard
+                                    </div>
+                                    <span class="badge bg-success rounded-pill">60 m²</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="drag-handle"><i class="bi bi-grip-vertical"></i></span>
+                                        <span class="badge bg-primary rounded-pill me-2">2</span>
+                                        Back Yard
+                                    </div>
+                                    <span class="badge bg-success rounded-pill">120 m²</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="drag-handle"><i class="bi bi-grip-vertical"></i></span>
+                                        <span class="badge bg-primary rounded-pill me-2">3</span>
+                                        Side Garden
+                                    </div>
+                                    <span class="badge bg-success rounded-pill">45 m²</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center bg-light text-muted">
+                                    <div>
+                                        <span class="drag-handle"><i class="bi bi-grip-vertical"></i></span>
+                                        <span class="badge bg-secondary rounded-pill me-2">-</span>
+                                        Play Area (disabled)
+                                    </div>
+                                    <span class="badge bg-secondary rounded-pill">25 m²</span>
+                                </li>
+                            </ul>
+                            <div class="d-grid gap-2 mt-3">
+                                <button id="save-sequence-btn" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> Save Sequence
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content Area -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Zone Management</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="export-zones-btn">
+                                <i class="bi bi-download"></i> Export
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="import-zones-btn">
+                                <i class="bi bi-upload"></i> Import
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="help-btn">
+                            <i class="bi bi-question-circle"></i> Help
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Zone Toolbar -->
+                <div class="zone-toolbar mb-4">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text">View Mode</span>
+                                <select class="form-select" id="view-mode">
+                                    <option value="all">All Zones</option>
+                                    <option value="active">Active Zones Only</option>
+                                    <option value="inactive">Inactive Zones Only</option>
+                                    <option value="coverage">Coverage Map</option>
+                                </select>
+                                <button class="btn btn-outline-secondary" type="button" id="refresh-map-btn">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="btn-group float-end" role="group">
+                                <button type="button" class="btn btn-outline-secondary" id="zoom-in-btn">
+                                    <i class="bi bi-zoom-in"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="zoom-out-btn">
+                                    <i class="bi bi-zoom-out"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="reset-view-btn">
+                                    <i class="bi bi-arrows-fullscreen"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Zone Map -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">Zone Map</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="map-container">
+                            <canvas id="zone-map" class="map-canvas"></canvas>
+                            <div class="zone-controls">
+                                <div class="btn-group-vertical">
+                                    <button class="btn btn-sm btn-outline-primary mb-1" id="draw-zone-btn">
+                                        <i class="bi bi-pencil"></i> Draw Zone
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger mb-1" id="draw-obstacle-btn">
+                                        <i class="bi bi-x-circle"></i> Mark Obstacle
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success mb-1" id="set-dock-btn">
+                                        <i class="bi bi-house"></i> Set Dock
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" id="clear-current-btn">
+                                        <i class="bi bi-eraser"></i> Clear Current
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="map-legend">
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: rgba(40, 167, 69, 0.5);"></div>
+                                    <small>Front Yard</small>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: rgba(0, 123, 255, 0.5);"></div>
+                                    <small>Back Yard</small>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: rgba(255, 193, 7, 0.5);"></div>
+                                    <small>Side Garden</small>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: rgba(108, 117, 125, 0.5);"></div>
+                                    <small>Play Area (disabled)</small>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: rgba(220, 53, 69, 0.5);"></div>
+                                    <small>Obstacles</small>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: rgba(23, 162, 184, 0.5);"></div>
+                                    <small>Dock Location</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Zone List -->
+                <h3 class="mb-3">Zone Details</h3>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
+                    <!-- Front Yard Zone Card -->
+                    <div class="col">
+                        <div class="card h-100 zone-card" data-zone-id="1">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">Front Yard</h5>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="zone1-active" checked>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Area:</span>
+                                        <span>60 m²</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Mowing Pattern:</span>
+                                        <span><i class="bi bi-grid-3x3 pattern-icon"></i> Grid</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Cutting Height:</span>
+                                        <span>45 mm</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span>Last Mowed:</span>
+                                        <span>2 days ago</span>
+                                    </div>
+                                </div>
+                                <div class="progress mb-2" style="height: 5px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 100%;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">Fully mowed - 100% complete</small>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-sm btn-outline-primary" data-zone-id="1">
+                                    <i class="bi bi-gear"></i> Configure
+                                </button>
+                                <button class="btn btn-sm btn-outline-success ms-1" data-zone-id="1">
+                                    <i class="bi bi-play"></i> Mow Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Back Yard Zone Card -->
+                    <div class="col">
+                        <div class="card h-100 zone-card" data-zone-id="2">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">Back Yard</h5>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="zone2-active" checked>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Area:</span>
+                                        <span>120 m²</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Mowing Pattern:</span>
+                                        <span><i class="bi bi-arrow-left-right pattern-icon"></i> Lines</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Cutting Height:</span>
+                                        <span>50 mm</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span>Last Mowed:</span>
+                                        <span>Yesterday</span>
+                                    </div>
+                                </div>
+                                <div class="progress mb-2" style="height: 5px;">
+                                    <div class="progress-bar bg-warning" role="progressbar" style="width: 75%;" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">Partially mowed - 75% complete</small>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-sm btn-outline-primary" data-zone-id="2">
+                                    <i class="bi bi-gear"></i> Configure
+                                </button>
+                                <button class="btn btn-sm btn-outline-success ms-1" data-zone-id="2">
+                                    <i class="bi bi-play"></i> Mow Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Side Garden Zone Card -->
+                    <div class="col">
+                        <div class="card h-100 zone-card" data-zone-id="3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">Side Garden</h5>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="zone3-active" checked>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Area:</span>
+                                        <span>45 m²</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Mowing Pattern:</span>
+                                        <span><i class="bi bi-arrow-repeat pattern-icon"></i> Spiral</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Cutting Height:</span>
+                                        <span>35 mm</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span>Last Mowed:</span>
+                                        <span>4 days ago</span>
+                                    </div>
+                                </div>
+                                <div class="progress mb-2" style="height: 5px;">
+                                    <div class="progress-bar bg-danger" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">Not yet mowed - 0% complete</small>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-sm btn-outline-primary" data-zone-id="3">
+                                    <i class="bi bi-gear"></i> Configure
+                                </button>
+                                <button class="btn btn-sm btn-outline-success ms-1" data-zone-id="3">
+                                    <i class="bi bi-play"></i> Mow Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Play Area Zone Card (Disabled) -->
+                    <div class="col">
+                        <div class="card h-100 zone-card text-muted" data-zone-id="4">
+                            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                                <h5 class="card-title mb-0">Play Area</h5>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="zone4-active">
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Area:</span>
+                                        <span>25 m²</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Mowing Pattern:</span>
+                                        <span><i class="bi bi-grid pattern-icon"></i> Perimeter</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Cutting Height:</span>
+                                        <span>40 mm</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span>Last Mowed:</span>
+                                        <span>Never</span>
+                                    </div>
+                                </div>
+                                <div class="alert alert-secondary p-2">
+                                    <small><i class="bi bi-info-circle"></i> This zone is currently disabled</small>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-light">
+                                <button class="btn btn-sm btn-outline-primary" data-zone-id="4">
+                                    <i class="bi bi-gear"></i> Configure
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary ms-1" data-zone-id="4" disabled>
+                                    <i class="bi bi-play"></i> Mow Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Add Zone Modal -->
+    <div class="modal fade" id="addZoneModal" tabindex="-1" aria-labelledby="addZoneModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addZoneModalLabel">Add New Zone</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-zone-form">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="zone-name" class="form-label">Zone Name</label>
+                                <input type="text" class="form-control" id="zone-name" placeholder="e.g., Front Yard" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="zone-color" class="form-label">Zone Color</label>
+                                <input type="color" class="form-control form-control-color w-100" id="zone-color" value="#28a745" title="Choose zone color">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="mowing-pattern" class="form-label">Mowing Pattern</label>
+                                <select class="form-select" id="mowing-pattern" required>
+                                    <option value="grid">Grid</option>
+                                    <option value="lines">Parallel Lines</option>
+                                    <option value="spiral">Spiral</option>
+                                    <option value="perimeter">Perimeter First</option>
+                                    <option value="zigzag">Zigzag</option>
+                                    <option value="random">Random</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="cutting-height" class="form-label">Cutting Height (mm)</label>
+                                <input type="number" class="form-control" id="cutting-height" min="20" max="80" value="45" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="overlap-percentage" class="form-label">Path Overlap (%)</label>
+                                <input type="number" class="form-control" id="overlap-percentage" min="0" max="50" value="10">
+                                <div class="form-text">Percentage of path width to overlap with previous pass</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="border-passes" class="form-label">Border Passes</label>
+                                <input type="number" class="form-control" id="border-passes" min="0" max="5" value="2">
+                                <div class="form-text">Number of passes around the perimeter</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="zone-priority" class="form-label">Priority</label>
+                                <select class="form-select" id="zone-priority">
+                                    <option value="high">High</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="low">Low</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="zone-active" class="form-label">Status</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="zone-active" checked>
+                                    <label class="form-check-label" for="zone-active">Zone Active</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="zone-notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="zone-notes" rows="3" placeholder

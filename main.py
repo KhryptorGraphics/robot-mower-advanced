@@ -2,192 +2,371 @@
 """
 Robot Mower Advanced - Main Entry Point
 
-This script serves as the entry point for the Robot Mower Advanced system.
-It initializes the application, loads configurations, and starts all necessary services.
+This is the main entry point for the Robot Mower Advanced software.
+It initializes all necessary components and starts the system.
 """
 
 import os
 import sys
-import argparse
 import logging
-from pathlib import Path
-import time
+import argparse
 import signal
+import time
+from typing import Dict, Any, Optional
+import yaml
 
-from core.application import Application
-from core.config import ConfigManager
-from hardware.factory import HardwareFactory
-# No SensorManager class, we use dict of sensors instead
-from navigation.edge_following import EdgeFollowingController
-from navigation.zone_management import ZoneManager
-from perception.lawn_health import LawnHealthAnalyzer
-from perception.growth_prediction import GrassGrowthPredictor
-from perception.object_detection import ObjectDetector
-from scheduling.weather_scheduler import WeatherBasedScheduler
-from maintenance.maintenance_tracker import MaintenanceTracker
-from security.theft_protection import TheftProtection
-from web.app import WebInterface
+# Setup basic logging - will be enhanced once config is loaded
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger('main')
+
+# Global flag for stopping the program
+running = True
+
+
+def signal_handler(sig, frame):
+    """Handle signals to properly shutdown the system"""
+    global running
+    logger.info(f"Received signal {sig}, initiating shutdown...")
+    running = False
 
 
 def parse_arguments():
     """Parse command line arguments"""
-    parser = argparse.ArgumentParser(description="Robot Mower Advanced Control System")
+    parser = argparse.ArgumentParser(description='Robot Mower Advanced Control System')
     
-    parser.add_argument("--config", type=str, default="config/default_config.yaml",
-                        help="Path to configuration file (default: config/default_config.yaml)")
+    parser.add_argument('--config', 
+                        type=str, 
+                        default='config/local_config.yaml',
+                        help='Path to configuration file')
     
-    parser.add_argument("--log-level", type=str, default=None, 
-                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-                        help="Logging level (overrides config)")
+    parser.add_argument('--log-level', 
+                        type=str, 
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        default='INFO', 
+                        help='Set logging level')
     
-    parser.add_argument("--data-dir", type=str, default=None,
-                        help="Data directory path (overrides config)")
+    parser.add_argument('--data-dir', 
+                        type=str, 
+                        default='data',
+                        help='Data directory')
     
-    parser.add_argument("--dev", action="store_true",
-                        help="Development mode (more verbose output)")
+    parser.add_argument('--dev', 
+                        action='store_true',
+                        help='Run in development mode')
     
-    parser.add_argument("--no-web", action="store_true",
-                        help="Disable web interface")
+    parser.add_argument('--no-web', 
+                        action='store_true',
+                        help='Disable web interface')
     
-    parser.add_argument("--sim", action="store_true",
-                        help="Run in simulation mode (no physical hardware)")
+    parser.add_argument('--sim', 
+                        action='store_true',
+                        help='Run in simulation mode (no hardware)')
     
-    parser.add_argument("--test", action="store_true",
-                        help="Run system test and exit")
+    parser.add_argument('--test', 
+                        action='store_true',
+                        help='Run system test and exit')
+    
+    parser.add_argument('--update', 
+                        action='store_true',
+                        help='Update software from repository')
+    
+    parser.add_argument('--backup', 
+                        action='store_true',
+                        help='Create a backup of configuration and data')
+    
+    parser.add_argument('--restore', 
+                        type=str,
+                        help='Restore from a backup file')
+    
+    parser.add_argument('--reset-config', 
+                        action='store_true',
+                        help='Reset to default configuration')
+    
+    parser.add_argument('--calibrate', 
+                        action='store_true',
+                        help='Run sensor calibration routines')
     
     return parser.parse_args()
 
 
+def load_config(config_path: str) -> Dict[str, Any]:
+    """
+    Load configuration from YAML file
+    
+    Args:
+        config_path: Path to the configuration file
+        
+    Returns:
+        Dictionary with configuration values
+    """
+    logger.info(f"Loading configuration from {config_path}")
+    
+    # Check if config path exists
+    if not os.path.exists(config_path):
+        # Try to find the default config
+        default_config_path = os.path.join(
+            os.path.dirname(config_path), 'default_config.yaml')
+        
+        if os.path.exists(default_config_path):
+            logger.warning(f"Configuration file {config_path} not found, "
+                          f"using default configuration at {default_config_path}")
+            config_path = default_config_path
+        else:
+            logger.error(f"No configuration file found at {config_path} "
+                        f"and no default configuration available.")
+            sys.exit(1)
+    
+    # Load the config file
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        logger.debug(f"Loaded configuration: {config}")
+        return config
+    except Exception as e:
+        logger.error(f"Error loading configuration from {config_path}: {e}")
+        sys.exit(1)
+
+
+def configure_logging(config: Dict[str, Any], args) -> None:
+    """Configure logging based on configuration and command line args"""
+    # Determine log level - command line args override config
+    log_level_name = args.log_level
+    if 'system' in config and 'log_level' in config['system']:
+        log_level_name = config['system']['log_level']
+    
+    # Convert string to logging level
+    log_level = getattr(logging, log_level_name.upper(), logging.INFO)
+    
+    # Determine log file
+    log_file = None
+    if 'system' in config and 'log_file' in config['system']:
+        log_file = config['system']['log_file']
+    
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    
+    # Clear existing handlers
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Add console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    root_logger.addHandler(console_handler)
+    
+    # Add file handler if log file is specified
+    if log_file:
+        # Ensure the logs directory exists
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        
+        # Add file handler
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        root_logger.addHandler(file_handler)
+    
+    logger.debug(f"Logging configured with level {log_level_name}")
+
+
+def handle_special_actions(args) -> bool:
+    """
+    Handle special command line actions like backup, restore, etc.
+    
+    Returns:
+        True if a special action was performed, False otherwise
+    """
+    if args.update:
+        logger.info("Updating software from repository")
+        # Implement software update logic here
+        # ...
+        return True
+    
+    if args.backup:
+        logger.info("Creating backup of configuration and data")
+        # Implement backup logic here
+        # ...
+        return True
+    
+    if args.restore:
+        logger.info(f"Restoring from backup file {args.restore}")
+        # Implement restore logic here
+        # ...
+        return True
+    
+    if args.reset_config:
+        logger.info("Resetting to default configuration")
+        # Implement config reset logic here
+        # ...
+        return True
+    
+    if args.calibrate:
+        logger.info("Running sensor calibration routines")
+        # Implement calibration logic here
+        # ...
+        return True
+    
+    if args.test:
+        logger.info("Running system test")
+        # Implement system test logic here
+        # ...
+        return True
+    
+    return False
+
+
+def initialize_system(config: Dict[str, Any], args) -> Dict[str, Any]:
+    """
+    Initialize the system components
+    
+    Args:
+        config: System configuration
+        args: Command line arguments
+        
+    Returns:
+        Dictionary with initialized components
+    """
+    logger.info("Initializing system components")
+    
+    components = {}
+    
+    # Set simulation mode flag based on args
+    simulation_mode = args.sim
+    
+    try:
+        # Initialize components here - examples:
+        
+        # Initialize hardware interface
+        # This would be replaced with actual implementations in a real system
+        from hardware.sensors import UltrasonicSensor, MPU6050IMUSensor
+        
+        # Import navigation components
+        from navigation.path_planning import PathPlanner, PathPlanningConfig, MowingPattern
+        
+        # Create sensor instances
+        # In simulation mode, sensors will use mock data
+        if not simulation_mode:
+            # Try to initialize real hardware
+            try:
+                # Example sensor initialization
+                ultrasonic_sensor = UltrasonicSensor(
+                    trigger_pin=config.get('hardware', {}).get('sensors', {})
+                    .get('ultrasonic', {}).get('trigger_pin', 23),
+                    echo_pin=config.get('hardware', {}).get('sensors', {})
+                    .get('ultrasonic', {}).get('echo_pin', 24)
+                )
+                components['ultrasonic_sensor'] = ultrasonic_sensor
+                
+                imu_sensor = MPU6050IMUSensor(config)
+                components['imu_sensor'] = imu_sensor
+                
+                logger.info("Hardware components initialized successfully")
+            except Exception as e:
+                logger.error(f"Error initializing hardware: {e}")
+                logger.info("Falling back to simulation mode")
+                simulation_mode = True
+        
+        # If in simulation mode, use mock components
+        if simulation_mode:
+            logger.info("Running in simulation mode with mock hardware")
+            # Initialize mock sensors and other components
+            # ...
+            
+        # Initialize path planning
+        mowing_pattern_str = config.get('navigation', {}).get('mowing_pattern', 'parallel_lines')
+        try:
+            mowing_pattern = MowingPattern(mowing_pattern_str)
+        except ValueError:
+            logger.warning(f"Invalid mowing pattern '{mowing_pattern_str}', using default")
+            mowing_pattern = MowingPattern.PARALLEL_LINES
+        
+        path_planning_config = PathPlanningConfig(
+            pattern=mowing_pattern,
+            line_direction=config.get('navigation', {}).get('line_direction', 0.0),
+            path_overlap_percent=config.get('navigation', {}).get('path_overlap_percent', 10.0),
+            perimeter_passes=config.get('navigation', {}).get('perimeter_passes', 2)
+        )
+        
+        # Mower width in meters
+        mower_width = config.get('hardware', {}).get('mower_width', 0.3)
+        
+        path_planner = PathPlanner(mower_width=mower_width, config=path_planning_config)
+        components['path_planner'] = path_planner
+        
+        # Initialize web interface if not disabled
+        if not args.no_web:
+            # We would import and initialize the web interface here
+            # For now, just log that it would be initialized
+            logger.info("Web interface would be initialized here")
+        
+        logger.info("System initialization complete")
+        
+    except Exception as e:
+        logger.error(f"Error during system initialization: {e}")
+        sys.exit(1)
+    
+    return components
+
+
 def main():
-    """Main entry point"""
+    """Main entry point for the application"""
+    # Register signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     # Parse command line arguments
     args = parse_arguments()
     
-    # Set development mode if specified
-    dev_mode = args.dev
+    # Load configuration
+    config = load_config(args.config)
     
     # Configure logging
-    log_level = args.log_level or ("DEBUG" if dev_mode else "INFO")
+    configure_logging(config, args)
     
-    # Initialize application
-    app = Application(
-        app_name="RobotMower",
-        config_dir=os.path.dirname(args.config),
-        log_level=log_level
-    )
+    # Handle special actions (if any)
+    if handle_special_actions(args):
+        return 0
     
-    # Get logger
-    logger = app.log_manager.get_logger("Main")
-    logger.info("Starting Robot Mower Advanced system")
+    # Initialize system components
+    components = initialize_system(config, args)
     
-    # Load configuration
-    config_path = Path(args.config).resolve()
-    if not config_path.exists():
-        logger.error(f"Configuration file not found: {config_path}")
-        return 1
+    logger.info("Robot Mower Advanced system starting...")
     
-    app.config_manager.load_config(str(config_path))
-    logger.info(f"Loaded configuration from {config_path}")
-    
-    # Override config with command line args
-    if args.data_dir:
-        app.config_manager.set("system.data_dir", args.data_dir)
-    
-    # Create data directory
-    data_dir = app.config_manager.get("system.data_dir", "data")
-    os.makedirs(data_dir, exist_ok=True)
-    
-    # Initialize hardware
+    # Main loop
     try:
-        # Create hardware factory
-        hardware_factory = HardwareFactory(
-            app.config_manager,
-            service_locator=app.container
-        )
-        app.register_service(HardwareFactory, factory=lambda: hardware_factory)
-        
-        # Initialize hardware components
-        motor_controller = hardware_factory.create_motor_controller()
-        blade_controller = hardware_factory.create_blade_controller()
-        app.register_service(type(motor_controller), factory=lambda: motor_controller)
-        app.register_service(type(blade_controller), factory=lambda: blade_controller)
-        
-        # Initialize sensors
-        sensors = hardware_factory.create_all_sensors()
-        app.register_service(dict, factory=lambda: sensors)
-        
-        # Start application
-        app.startup()
-        
-        # Initialize higher-level services
-        zone_manager = ZoneManager(app.config_manager, sensors)
-        edge_controller = EdgeFollowingController(app.config_manager, motor_controller, sensors)
-        maintenance_tracker = MaintenanceTracker(app.config_manager)
-        lawn_health = LawnHealthAnalyzer(app.config_manager, sensors)
-        growth_predictor = GrassGrowthPredictor(app.config_manager)
-        weather_scheduler = WeatherBasedScheduler(app.config_manager)
-        theft_protection = TheftProtection(app.config_manager, sensors)
-        
-        # Register services with the application
-        app.register_service(ZoneManager, factory=lambda: zone_manager)
-        app.register_service(EdgeFollowingController, factory=lambda: edge_controller)
-        app.register_service(MaintenanceTracker, factory=lambda: maintenance_tracker)
-        app.register_service(LawnHealthAnalyzer, factory=lambda: lawn_health)
-        app.register_service(GrassGrowthPredictor, factory=lambda: growth_predictor)
-        app.register_service(WeatherBasedScheduler, factory=lambda: weather_scheduler)
-        app.register_service(TheftProtection, factory=lambda: theft_protection)
-        
-        # Initialize object detection if enabled
-        if app.config_manager.get("perception.object_detection.enabled", False):
-            object_detector = ObjectDetector(app.config_manager, sensors)
-            app.register_service(ObjectDetector, factory=lambda: object_detector)
-        
-        # Start web interface if not disabled
-        if not args.no_web:
-            web_interface = WebInterface(
-                app.config_manager,
-                power_manager=sensors.get("power") if sensors else None,
-                zone_manager=zone_manager,
-                health_analyzer=lawn_health,
-                growth_predictor=growth_predictor,
-                maintenance_tracker=maintenance_tracker,
-                theft_protection=theft_protection,
-                weather_scheduler=weather_scheduler
-            )
-            app.register_service(WebInterface, factory=lambda: web_interface)
-            web_interface.start()
-        
-        # For test mode, run a quick test and exit
-        if args.test:
-            logger.info("Running system test...")
-            # Implement test routine here
-            logger.info("System test completed successfully")
-            return 0
-        
-        # Main control loop
-        logger.info("Robot Mower system running. Press Ctrl+C to exit.")
-        
-        try:
-            # Wait for shutdown signal
-            app.wait_for_shutdown()
-        except KeyboardInterrupt:
-            logger.info("Received keyboard interrupt, shutting down...")
-        finally:
-            # Cleanup
-            logger.info("Shutting down Robot Mower system...")
+        while running:
+            # Main system logic would go here
+            # For now, just sleep and log
+            time.sleep(1)
             
-            # Stop web interface
-            if not args.no_web and web_interface:
-                web_interface.stop()
+            # TODO: Implement main control loop logic
+            # - Check sensors
+            # - Update navigation
+            # - Control motors
+            # - etc.
             
-            # Stop application
-            app.shutdown()
-            
-            logger.info("Robot Mower system shutdown complete")
-    
     except Exception as e:
-        logger.error(f"Error during initialization: {str(e)}", exc_info=True)
+        logger.error(f"Error in main loop: {e}")
         return 1
+    finally:
+        # Clean up resources
+        logger.info("Cleaning up resources...")
+        
+        # Clean up components
+        for name, component in components.items():
+            if hasattr(component, 'cleanup'):
+                try:
+                    component.cleanup()
+                except Exception as e:
+                    logger.error(f"Error cleaning up {name}: {e}")
+        
+        logger.info("System shutdown complete")
     
     return 0
 
