@@ -9,29 +9,19 @@ An advanced robotic lawn mower platform with SLAM mapping, computer vision, path
 - [Features](#features)
 - [System Architecture](#system-architecture)
 - [Hardware Requirements](#hardware-requirements)
-  - [Raspberry Pi Setup](#raspberry-pi-setup)
-  - [Control Panel Server Setup](#control-panel-server-setup)
-  - [Optional Components](#optional-components)
+- [Beginner's Guide: Getting Started](#beginners-guide-getting-started)
 - [Installation](#installation)
   - [Raspberry Pi Installation](#raspberry-pi-installation)
   - [Ubuntu Server Installation](#ubuntu-server-installation)
-- [Configuration](#configuration)
+- [Understanding Configuration Files](#understanding-configuration-files)
   - [Core Settings](#core-settings)
   - [SLAM Configuration](#slam-configuration)
   - [Path Planning Configuration](#path-planning-configuration)
   - [Hardware Configuration](#hardware-configuration)
   - [Web Interface Configuration](#web-interface-configuration)
 - [Usage](#usage)
-  - [Web Interface](#web-interface)
-  - [Zone Management](#zone-management)
-  - [Scheduling](#scheduling)
-  - [Manual Control](#manual-control)
-  - [Monitoring](#monitoring)
 - [Software Architecture](#software-architecture)
-  - [Directory Structure](#directory-structure)
-  - [Core Components](#core-components)
-  - [Module Interaction](#module-interaction)
-- [Troubleshooting](#troubleshooting)
+- [Troubleshooting Guide for Beginners](#troubleshooting-guide-for-beginners)
 - [Maintenance](#maintenance)
 - [Contributing](#contributing)
 - [License](#license)
@@ -77,21 +67,21 @@ An advanced robotic lawn mower platform with SLAM mapping, computer vision, path
 
 ## System Architecture
 
-The Robot Mower Advanced system consists of two main components:
+The Robot Mower Advanced system consists of two main components that work together:
 
-1. **Raspberry Pi Controller**: Installed on the mower itself
-   - Handles real-time control, sensor integration, and decision making
-   - Runs the core SLAM and navigation algorithms
-   - Communicates with motor controllers and sensors
-   - Operates autonomously when disconnected from the network
+1. **Raspberry Pi Controller**: This is the "brain" installed on the mower itself
+   - It handles real-time control, reads all sensors, and makes decisions
+   - Runs the core SLAM (mapping) and navigation algorithms
+   - Controls the motors and interfaces with all hardware
+   - Can operate independently when Wi-Fi is not available
 
-2. **Control Panel Server**: Runs on a separate Ubuntu machine
-   - Provides the web interface for remote control and monitoring
-   - Stores long-term data and statistics
-   - Handles scheduling and higher-level planning
-   - Serves as the central point for user interaction
+2. **Control Panel Server**: This runs on a separate computer in your house
+   - Provides a web interface you can access from any device
+   - Stores data like maps, usage statistics, and settings
+   - Handles scheduling and planning of mowing sessions
+   - Acts as the central point for you to monitor and control the mower
 
-These components communicate over your local network using a secure protocol, with the mower operating independently when network connectivity is unavailable.
+These components talk to each other over your home Wi-Fi network. Even if the Wi-Fi connection is lost, your mower will continue operating safely.
 
 ```
                   ┌───────────────────┐         ┌───────────────────┐
@@ -112,561 +102,415 @@ These components communicate over your local network using a secure protocol, wi
 
 ## Hardware Requirements
 
-### Detailed Hardware List with Model Numbers
+For detailed hardware requirements, component selection, and specific model recommendations, see our [Detailed Hardware List](hardware_guide.md#complete-bill-of-materials).
 
-#### Raspberry Pi Setup
+For step-by-step hardware assembly instructions, wiring diagrams, and component installation guides, refer to the [Comprehensive Hardware Guide](hardware_guide.md).
 
-- **Compute Platform**:
-  - **Raspberry Pi 4 Model B** (8GB RAM recommended, 4GB minimum) - [Raspberry Pi 4 Model B](https://www.raspberrypi.com/products/raspberry-pi-4-model-b/)
-  - **32GB+ SanDisk Extreme Pro microSD card** (high endurance for prolonged logging)
-  - **Raspberry Pi PoE HAT** or **Argon ONE M.2 Case** with cooling fan
+## Beginner's Guide: Getting Started
 
-- **Sensors**:
-  - **Ultrasonic Sensors**: 6× HC-SR04 or 4× MaxBotix MB1240 (superior performance)
-    - Front: 2× sensors (HC-SR04P or MaxBotix MB1240)
-    - Sides: 2× sensors (HC-SR04P or MaxBotix MB1240)
-    - Rear: 2× sensors (HC-SR04P or MaxBotix MB1240)
-  
-  - **IMU Sensor**: MPU-6050 or MPU-9250 (9-axis IMU recommended)
-    - MPU-9250 preferred for Magnetometer functionality
-    - Alternative: BNO055 for built-in sensor fusion
-  
-  - **Wheel Encoders**: 
-    - LM393 Speed Sensor (2× units) or
-    - AS5048A Magnetic Rotary Encoder (higher precision)
-  
-  - **Camera Module**: 
-    - Raspberry Pi Camera Module 3 Wide (preferred)
-    - Alternative: Raspberry Pi HQ Camera with 6mm Wide Angle Lens
-  
-  - **GPS Module**:
-    - Standard: NEO-6M GPS Module
-    - High Precision: NEO-M8P RTK GPS Module (centimeter precision)
-    - Professional: Emlid Reach M2 RTK GPS (survey-grade)
-  
-  - **Optional Sensors**:
-    - **ToF Sensors**: 3× VL53L1X Time-of-Flight sensors
-    - **Rain Sensor**: YL-83 or FC-37 Rain Detection Module
-    - **Tilt Sensor**: ADXL345 Accelerometer
-    - **Grass Height Sensor**: ToF VL53L0X with custom mount
+If you're new to Linux or Raspberry Pi projects, here's a simple breakdown of what you'll need to do:
 
-- **Motor Control**:
-  - For Small Mowers:
-    - **Motor Driver**: L298N Dual H-Bridge Motor Driver (up to 2A per channel)
-    - Alternative: TB6612FNG Dual Motor Driver (better efficiency than L298N)
-  
-  - For Medium Mowers:
-    - **Motor Driver**: Cytron 13A DC Motor Driver (MDD10A or MD13S)
-    - Alternative: Pololu Dual G2 High-Power Motor Driver 18v18 or 24v13
-  
-  - For Large/Heavy Mowers:
-    - **Motor Driver**: Sabertooth 2X32 or RoboClaw 2x30A Motor Controller
-    - Alternative: ODrive v3.6 for brushless motor control
-  
-  - **Cutting Motor Control**:
-    - BTS7960 43A High-Power Motor Driver for blade motor
-    - Alternative: MOSFET IRF3205 with suitable gate driver
+1. **Purchase the Required Hardware**: Use our [Hardware Guide](hardware_guide.md) to buy all the necessary components.
 
-- **Power System**:
-  - **Battery**:
-    - **LiFePO4**: 4S 12.8V 20Ah battery pack (longer life, safer chemistry)
-    - Alternative: 6S or 7S Li-ion 24V battery for higher power systems
-    - Recommended Brands: RB/GBS/LiitoKala for LiFePO4, LiitoKala for Li-ion
-  
-  - **Power Management**:
-    - DC-DC Converter: LM2596 based buck converter (3A version)
-    - High-Current Version: DROK Buck Converter 8A or XL4016 DC-DC Converter
-    - Power Monitoring: INA219 Current/Voltage Sensor
-  
-  - **Charging**:
-    - TP4056 Li-ion Charging Boards (for small systems)
-    - Robust Solution: Battery Management System (BMS) for 4S or 6S battery
-    - Charging Contacts: 2× Spring-loaded Pogo Pins (gold-plated)
+2. **Assemble the Hardware**: Follow the [Hardware Assembly Instructions](hardware_guide.md#mechanical-construction) to build the mower.
 
-- **Additional Hardware**:
-  - **Emergency Stop**: Red Mushroom E-Stop Button with NC contacts
-  - **Status Display**: 0.96" OLED I2C Display (SSD1306 controller)
-  - **Indicators**: 5× 5mm RGB LEDs for status indication
-  - **Buttons/Switches**: 3× Waterproof Momentary Push Buttons
-  - **Enclosure**: IP65 Rated ABS Enclosure (200×120×75mm minimum)
-  - **Optional NPU**: Hailo-8 or Hailo-8L NPU for AI acceleration
-  - **Wiring/Connectors**: 
-    - JST connectors for sensors
-    - XT60/XT90 connectors for power
-    - Waterproof M12 connectors for external connections
+3. **Set Up the Raspberry Pi**: You'll install a special operating system and our software on it.
 
-#### Control Panel Server Setup
+4. **Set Up the Control Panel**: You'll install our software on a computer in your home that will act as the control center.
 
-- **Minimum System Requirements**:
-  - **SBC Option**: Raspberry Pi 4 (4GB) or ODROID-N2+
-  - **Mini PC Option**: Intel NUC (Celeron or better)
-  - **Server Option**: Any Ubuntu-compatible server with 2GB+ RAM
-  - **Storage**: 32GB SSD/eMMC minimum, 120GB SSD recommended
-  - **Network**: Ethernet preferred, WiFi 5 (802.11ac) or better
-  - Recommended Models:
-    - Budget: Raspberry Pi 4 8GB
-    - Mid-range: ODROID-N2+ or Intel NUC7CJYH
-    - Premium: Intel NUC10i3FNK or Dell Optiplex 3060 Micro
+5. **Configure and Test**: You'll adjust settings and test each component before the first use.
 
-- **Network Requirements**:
-  - **Router**: Any modern router with VPN capability
-  - **For Remote Access**: Port forwarding capability or VPN
-  - **Optional**: TP-Link Omada or Ubiquiti UniFi access points for better coverage
-  - **For Large Areas**: Outdoor wireless AP with directional antenna
-
-### Optional Components with Recommended Models
-
-- **Docking Station**:
-  - **Charging Contacts**: 2× Gold-plated Spring Contacts (200mA minimum)
-  - **Guidance System**:
-    - Visual: ArUco Markers (600×600mm, weatherproof print)
-    - Alternative: 4× IR Beacons (TSOP38238 IR Receiver based)
-  - **Weather Protection**: IP65 Rated Enclosure with Rain Cover
-  - **Power Supply**: 24V 5A Power Supply with IP67 Rating
-
-- **Boundary Markers**:
-  - **Visual Markers**: 
-    - Weatherproof ArUco Markers (15x15cm printed on Coroplast)
-    - QR Code Markers (laminated, 10×10cm minimum)
-  - **RFID Markers**: 
-    - 125KHz RFID Tags with ID-12LA RFID Reader
-  - **Boundary Wire (optional)**:
-    - 2.5mm² Copper Wire, PVC Insulated
-    - Underground Installation: Use 1.5mm² for ease of installation
-
-- **Advanced Add-ons**:
-  - **Lawn Quality Sensors**:
-    - Soil Moisture: Capacitive Soil Moisture Sensor v1.2
-    - Soil Temperature: DS18B20 Waterproof Temperature Sensor
-  - **RTK Base Station**:
-    - DIY: Raspberry Pi Zero 2 W with NEO-M8P GNSS
-    - Commercial: Emlid Reach RS+ or Reach RS2
-  - **Additional Cameras**:
-    - Forward-looking: Raspberry Pi Camera Module 3
-    - Downward-facing: OV5647 Camera Module (low-cost)
-  - **Weather Station Integration**:
-    - DIY: BME280 Temperature/Humidity/Pressure Sensor
-    - Commercial: Ambient Weather WS-2902C Integration
-
-## Detailed Installation Guide
-
-This guide provides step-by-step instructions for installing the Robot Mower Advanced system on both the Raspberry Pi (mower controller) and Ubuntu Server (control panel).
-
-**For detailed hardware construction and wiring instructions, see the [Comprehensive Hardware Guide](hardware_guide.md)**
-
-### Raspberry Pi Installation (Mower Controller)
-
-#### 1. Hardware Assembly
-
-1. **Prepare the Enclosure**:
-   - Install the Raspberry Pi in an IP65-rated enclosure
-   - Mount the cooling fan and ensure proper ventilation
-   - Install the emergency stop button in an easily accessible location
-
-2. **Connect Sensors**:
-   - **Ultrasonic Sensors** (HC-SR04):
-     - Connect VCC to 5V power supply
-     - Connect GND to ground
-     - Connect TRIG pins to GPIO pins as configured in `config/local_config.yaml`
-     - Connect ECHO pins through a voltage divider (two resistors: 1kΩ and 2kΩ) to GPIO pins
-
-   - **IMU Sensor** (MPU6050):
-     - Connect VCC to 3.3V power supply
-     - Connect GND to ground
-     - Connect SCL to GPIO3 (I2C1 SCL)
-     - Connect SDA to GPIO2 (I2C1 SDA)
-
-   - **Wheel Encoders**:
-     - Connect VCC to 5V power supply
-     - Connect GND to ground
-     - Connect signal pins to GPIO pins as configured
-
-   - **Camera Module**:
-     - Connect the camera to the CSI connector on the Raspberry Pi
-     - Secure the ribbon cable with the connector latch
-
-3. **Motor Controller Setup**:
-   - **L298N Motor Driver** (for both drive motors):
-     - Connect motor power supply (VCC) to battery power (12-24V)
-     - Connect logic power supply to 5V (or use 5V from driver if available)
-     - Connect IN1, IN2, IN3, IN4 to GPIO pins as configured
-     - Connect ENA and ENB to PWM-capable GPIO pins
-     - Connect motor outputs to DC motors
-
-   - **Cutting Motor Control**:
-     - For high-power motors, use a separate BTS7960 or MOSFET controller
-     - Connect to appropriately rated GPIO pins through optocouplers for isolation
-
-4. **Power Management**:
-   - Install DC-DC converter to regulate battery voltage to 5V for Raspberry Pi
-   - Connect INA219 current sensor in-line with power supply to monitor consumption
-   - Wire emergency stop button to interrupt motor controllers
-
-#### 2. Software Installation
-
-1. **Prepare the Raspberry Pi**:
-   ```bash
-   # Flash Raspberry Pi OS Bullseye (64-bit recommended) to SD card using Raspberry Pi Imager
-   # Boot and perform initial setup
-   # Enable required interfaces:
-   sudo raspi-config
-   # Select: Interface Options > Camera > Enable
-   # Select: Interface Options > I2C > Enable
-   # Select: Interface Options > SPI > Enable
-   
-   # Update the system
-   sudo apt update && sudo apt upgrade -y
-   
-   # Install required packages
-   sudo apt install -y git python3-pip python3-venv
-   ```
-
-2. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/khryptorgraphics/robot-mower-advanced.git
-   cd robot-mower-advanced
-   ```
-
-3. **Run the Installation Script**:
-   ```bash
-   # Make installation script executable
-   chmod +x scripts/install_raspberry_pi.sh
-   
-   # Run the installation script
-   sudo ./scripts/install_raspberry_pi.sh
-   ```
-
-4. **Post-Installation Configuration**:
-   - Edit the configuration file to match your hardware setup:
-   ```bash
-   # Edit configuration with nano editor
-   nano config/local_config.yaml
-   
-   # Adjust GPIO pin assignments to match your wiring
-   # Configure motor parameters
-   # Set up sensor calibration values
-   ```
-
-   - Test the sensor connections:
-   ```bash
-   # Navigate to the project directory
-   cd ~/robot-mower-advanced
-   
-   # Run the sensor test utility
-   python3 utils/test_sensors.py
-   ```
-
-5. **Start the System**:
-   ```bash
-   # Start the system manually for testing
-   cd ~/robot-mower-advanced
-   ./start.sh
-   
-   # Or, enable the systemd service for automatic startup
-   sudo systemctl enable robot-mower.service
-   sudo systemctl start robot-mower.service
-   ```
-
-### Ubuntu Server Installation (Control Panel)
-
-#### 1. Hardware Setup
-
-1. **Prepare the Server**:
-   - Install Ubuntu Server 20.04 LTS or newer on your chosen hardware
-   - Ensure the system has a static IP address on your local network
-   - Open port 7799 in the firewall for the web interface
-
-2. **Network Configuration**:
-   ```bash
-   # Update the system
-   sudo apt update && sudo apt upgrade -y
-   
-   # Install required packages
-   sudo apt install -y git python3-pip python3-venv nginx
-   
-   # Configure firewall
-   sudo ufw allow 7799/tcp
-   sudo ufw enable
-   ```
-
-#### 2. Software Installation
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/khryptorgraphics/robot-mower-advanced.git
-   cd robot-mower-advanced
-   ```
-
-2. **Run the Installation Script**:
-   ```bash
-   # Make installation script executable
-   chmod +x scripts/install_ubuntu_server.sh
-   
-   # Run the installation script
-   sudo ./scripts/install_ubuntu_server.sh
-   ```
-
-3. **Configuration**:
-   - Edit the configuration file to set up the control panel:
-   ```bash
-   # Edit configuration
-   nano config/local_config.yaml
-   
-   # Set the mower's IP address
-   # Configure authentication
-   # Adjust web interface settings
-   ```
-
-4. **Start the Control Panel**:
-   ```bash
-   # Start the service
-   sudo systemctl start robot-mower-web.service
-   
-   # Enable automatic startup
-   sudo systemctl enable robot-mower-web.service
-   ```
-
-5. **Access the Web Interface**:
-   - Open a web browser and navigate to `http://[server-ip]:7799`
-   - Log in with the default credentials:
-     - Username: `admin`
-     - Password: `admin`
-   - Change the default password immediately after first login
-
-### Connecting the Systems
-
-1. **Network Configuration**:
-   - Ensure both systems are on the same local network
-   - Configure the Raspberry Pi to connect to your WiFi network:
-   ```bash
-   sudo raspi-config
-   # Select: System Options > Wireless LAN
-   # Enter your WiFi SSID and password
-   ```
-
-2. **Security Setup** (optional but recommended):
-   - Generate and install SSL certificates for secure communication:
-   ```bash
-   # On the Ubuntu Server
-   cd ~/robot-mower-advanced
-   sudo ./scripts/generate_ssl_cert.sh
-   ```
-
-3. **Testing Communication**:
-   - From the Ubuntu server, test connectivity to the Raspberry Pi:
-   ```bash
-   ping [raspberry-pi-ip]
-   ```
-   
-   - Test the API connection:
-   ```bash
-   curl http://[raspberry-pi-ip]:5000/api/status
-   ```
-
-4. **Final Configuration**:
-   - In the web interface, navigate to Settings > Connection
-   - Enter the Raspberry Pi's IP address
-   - Click "Test Connection" to verify
-   - Save the configuration
-
-### Troubleshooting Hardware Issues
-
-#### Common GPIO Issues
-
-- **Ultrasonic Sensors Not Responding**:
-  - Verify 5V power is reaching the sensors (measure with multimeter)
-  - Check GPIO pin assignments in configuration
-  - Ensure voltage dividers are installed for ECHO pins
-  - Test each sensor individually using the test script
-
-- **Motor Control Problems**:
-  - Verify PWM frequency configuration (1-5kHz recommended)
-  - Check for sufficient power supply current capacity
-  - Measure motor controller logic inputs with multimeter
-  - Isolate motor power from Raspberry Pi power to prevent interference
-
-- **IMU Sensor Issues**:
-  - Run `sudo i2cdetect -y 1` to verify I2C connection
-  - Check I2C address configuration (0x68 is default for MPU6050)
-  - Keep I2C cables short and away from power cables
-  - Run calibration utility: `python3 utils/calibrate_imu.py`
-
-- **Camera Problems**:
-  - Verify camera enabled in `raspi-config`
-  - Check ribbon cable connection (blue side faces away from ethernet port)
-  - Test camera with: `libcamera-still -o test.jpg`
-  - Ensure adequate lighting for vision functions
+This may seem complex, but we'll walk you through each step in detail below!
 
 ## Installation
 
 ### Raspberry Pi Installation
 
-The installation script is modular and allows for customization of which components to install.
+This section explains how to install the software on your Raspberry Pi (the mower's "brain").
 
-1. **Prepare the Raspberry Pi**:
-   ```bash
-   # Flash Raspberry Pi OS (64-bit recommended)
-   # Boot and perform initial setup (enable SSH, I2C, SPI, Camera)
-   sudo apt update && sudo apt upgrade -y
-   ```
+#### Step 1: Prepare Your Raspberry Pi
 
-2. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/khryptorgraphics/robot-mower-advanced.git
-   cd robot-mower-advanced
-   ```
+First, we need to set up the Raspberry Pi with its operating system and enable all the features we'll need.
 
-3. **Run the Installation Script**:
-   ```bash
-   sudo ./scripts/install_raspberry_pi.sh
-   ```
-   The script will guide you through the installation process with the following options:
-   - Core system installation
-   - Hardware interface configuration
-   - Optional Hailo NPU integration
-   - SLAM and path planning configuration
-   - Web interface setup
-   - Service configuration
+```bash
+# These instructions assume you've already:
+# 1. Downloaded and installed Raspberry Pi OS (64-bit recommended) to an SD card
+# 2. Inserted the SD card into your Raspberry Pi and powered it on
+# 3. Completed the initial setup (set password, connected to Wi-Fi, etc.)
 
-4. **Modules Installed**:
-   The Raspberry Pi installation includes several specialized modules:
-   - `core_install.sh`: Core system installation and repository management
-   - `dependencies.sh`: Hardware dependencies and Python packages
-   - `hailo_setup.sh`: Optional Hailo NPU configuration for enhanced vision
-   - `slam_path_planning.sh`: SLAM and navigation system setup
-   - `service_setup.sh`: Systemd services for automatic startup
+# Open a terminal and update your system (this downloads the latest software)
+sudo apt update && sudo apt upgrade -y
+# What this does: 'apt' is the package manager, 'update' refreshes the list of available packages,
+# 'upgrade' installs newer versions, and '-y' automatically answers "yes" to prompts
 
-5. **Post-Installation**:
-   After installation, the system will prompt for a reboot:
-   ```bash
-   sudo reboot
-   ```
+# Now enable the special interfaces we need for sensors and camera
+sudo raspi-config
+# This opens a configuration tool. Using the arrow keys and Enter:
+# Navigate to "Interface Options"
+# Enable: Camera, I2C, SPI
+# Select "Finish" and reboot if prompted
+```
+
+#### Step 2: Download Our Software
+
+Next, we'll download the software from GitHub to your Raspberry Pi.
+
+```bash
+# Install Git (the tool that downloads code repositories)
+sudo apt install -y git
+
+# Download (clone) our software repository
+git clone https://github.com/khryptorgraphics/robot-mower-advanced.git
+# This creates a new folder called 'robot-mower-advanced' with all our code
+
+# Enter the project directory
+cd robot-mower-advanced
+```
+
+#### Step 3: Run the Installation Script
+
+We've created an automated script that will install everything for you.
+
+```bash
+# Make the installation script executable
+chmod +x scripts/install_raspberry_pi.sh
+# This changes the file permission to allow execution
+
+# Run the installation script
+sudo ./scripts/install_raspberry_pi.sh
+# The script will ask you questions during installation - follow the prompts
+# It will install all necessary software packages and set up the system
+```
+
+#### Step 4: What the Installation Script Does
+
+Our installation script performs several important tasks for you:
+
+1. **Core System Installation** (`core_install.sh`): 
+   - Installs Python and required system packages
+   - Sets up the project environment
+   - Creates necessary directories
+
+2. **Dependencies Installation** (`dependencies.sh`):
+   - Installs libraries for hardware interfaces
+   - Sets up Python packages for sensors, motors, etc.
+   - Configures system permissions
+
+3. **Hailo Setup** (`hailo_setup.sh`, optional):
+   - Installs Hailo NPU drivers if you have this hardware
+   - Configures the vision acceleration system
+
+4. **SLAM and Path Planning Setup** (`slam_path_planning.sh`):
+   - Installs mapping and navigation libraries
+   - Configures the localization system
+
+5. **Service Setup** (`service_setup.sh`):
+   - Creates system services for automatic startup
+   - Sets up proper permissions
+   - Configures the system to start the mower software at boot
+
+#### Step 5: Configure Your System
+
+After installation, you'll need to customize settings for your specific hardware.
+
+```bash
+# Edit the configuration file to match your hardware
+nano config/local_config.yaml
+# This opens a text editor with the configuration file
+
+# Inside this file, adjust settings like:
+# - GPIO pin numbers (to match your wiring)
+# - Motor parameters (to match your motors)
+# - Sensor calibration values
+
+# Press Ctrl+O to save, then Enter, then Ctrl+X to exit
+```
+
+#### Step 6: Test Your Setup
+
+Before putting your mower on the lawn, test that all components work correctly.
+
+```bash
+# Test sensors and motors
+cd ~/robot-mower-advanced
+python3 utils/test_sensors.py
+# Follow the on-screen instructions to test each component
+```
+
+#### Step 7: Start the System
+
+Finally, you can start the system either manually or set it to run automatically at boot.
+
+```bash
+# Start manually for testing
+cd ~/robot-mower-advanced
+./start.sh
+
+# OR enable automatic startup
+sudo systemctl enable robot-mower.service
+sudo systemctl start robot-mower.service
+# This registers the service to start automatically when the Pi boots
+```
 
 ### Ubuntu Server Installation
 
-1. **Prepare the Ubuntu Server**:
-   ```bash
-   # Install Ubuntu Server 20.04 LTS or newer
-   sudo apt update && sudo apt upgrade -y
-   ```
+This section explains how to install the Control Panel software on a separate computer running Ubuntu.
 
-2. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/khryptorgraphics/robot-mower-advanced.git
-   cd robot-mower-advanced
-   ```
+#### Step 1: Prepare Your Ubuntu Server
 
-3. **Run the Installation Script**:
-   ```bash
-   sudo ./scripts/install_ubuntu_server.sh
-   ```
-   The script will guide you through the installation process with the following options:
-   - Core system installation
-   - Web application setup
-   - Database configuration
-   - Nginx configuration
-   - Service setup
+```bash
+# Update your system
+sudo apt update && sudo apt upgrade -y
 
-4. **Modules Installed**:
-   The Ubuntu Server installation includes several specialized modules:
-   - `core_install.sh`: Core system installation and dependencies
-   - `web_app_template.sh`: Flask web application setup
-   - `html_templates.sh`: Web interface HTML templates
-   - `config_manager.sh`: Configuration file management
-   - `service_setup.sh`: Nginx and systemd service configuration
+# Install required packages
+sudo apt install -y git python3-pip python3-venv nginx
+# What this installs:
+# - git: to download our code
+# - python3-pip and python3-venv: for Python packages
+# - nginx: web server for the control panel
 
-5. **Post-Installation**:
-   After installation, the Control Panel will be available at:
-   ```
-   http://[server-ip]:7799
-   ```
-   Default login credentials:
-   - Username: admin
-   - Password: admin (change this immediately after first login)
+# Configure the firewall to allow web access
+sudo ufw allow 7799/tcp
+sudo ufw enable
+# This opens port 7799 which the web interface will use
+```
 
-## Configuration
+#### Step 2: Download Our Software
 
-All configuration is managed through YAML files located in the `config/` directory:
+```bash
+# Download our software
+git clone https://github.com/khryptorgraphics/robot-mower-advanced.git
+cd robot-mower-advanced
+```
+
+#### Step 3: Run the Installation Script
+
+```bash
+# Make the script executable
+chmod +x scripts/install_ubuntu_server.sh
+
+# Run the installation script
+sudo ./scripts/install_ubuntu_server.sh
+# Follow the prompts to complete installation
+```
+
+#### Step 4: What the Installation Script Does
+
+Our Ubuntu server installation script includes several modules:
+
+1. **Core Installation** (`core_install.sh`):
+   - Sets up Python environment
+   - Installs required packages
+   - Creates necessary directories
+
+2. **Web App Setup** (`web_app_template.sh`):
+   - Installs Flask web framework
+   - Sets up the back-end API system
+   - Configures web application structure
+
+3. **HTML Templates** (`html_templates.sh`):
+   - Installs web interface files
+   - Sets up the dashboard, control panels, etc.
+
+4. **Config Manager** (`config_manager.sh`):
+   - Creates configuration files
+   - Sets up default settings
+
+5. **Service Setup** (`service_setup.sh`):
+   - Configures Nginx web server
+   - Creates system service for automatic startup
+   - Sets proper permissions
+
+#### Step 5: Configure the Control Panel
+
+After installation, you'll need to customize the Control Panel settings.
+
+```bash
+# Edit the configuration file
+nano config/local_config.yaml
+
+# Adjust settings like:
+# - The mower's IP address (so the control panel can find it)
+# - Authentication settings
+# - Web interface preferences
+```
+
+#### Step 6: Start the Control Panel
+
+```bash
+# Start the service
+sudo systemctl start robot-mower-web.service
+
+# Set it to start automatically at boot
+sudo systemctl enable robot-mower-web.service
+```
+
+#### Step 7: Access the Web Interface
+
+1. Open a web browser on any device on your network
+2. Navigate to `http://[your-server-ip]:7799`
+3. Log in with the default credentials:
+   - Username: `admin`
+   - Password: `admin`
+4. **Important**: Change the default password immediately!
+
+### Connecting the Systems
+
+Once both the Raspberry Pi and Ubuntu Server are set up, you need to connect them.
+
+1. **Make sure both are on the same network**:
+   - The Raspberry Pi and Ubuntu Server should be connected to the same home network
+   - Preferably use a wired ethernet connection for the server, and Wi-Fi for the Pi
+
+2. **Configure the connection in the web interface**:
+   - Log in to the web interface
+   - Go to Settings > Connection
+   - Enter the Raspberry Pi's IP address
+   - Test the connection
+   - Save settings
+
+3. **Test the full system**:
+   - On the web dashboard, you should see the mower status
+   - Try sending a simple command (like "Stop") to verify communication
+
+## Understanding Configuration Files
+
+All settings are stored in YAML format files in the `config/` directory. YAML is a human-readable format that uses indentation to structure data.
 
 ### Core Settings
 
-**File: config/local_config.yaml**
+The main configuration file is `config/local_config.yaml`. Here's what each section means:
+
+#### System Configuration
 
 ```yaml
-# System configuration
 system:
-  data_dir: "/home/pi/robot-mower-advanced/data"
-  log_level: "info"  # debug, info, warning, error
-  log_to_file: true
-  log_file: "logs/robot_mower.log"
-  enable_remote_monitoring: true
-  enable_telemetry: true
-
-# Mower hardware configuration
-mower:
-  name: "LawnMaster 5000"
-  cutting_width_mm: 320
-  max_speed_mps: 0.5  # meters per second
-  min_turning_radius_m: 0.5
-  wheel_diameter_mm: 200
-  encoder_pulses_per_revolution: 20
-  battery_capacity_mah: 5000
-  battery_voltage: 24.0
-  low_battery_threshold: 20  # percent
-  critical_battery_threshold: 10  # percent
+  data_dir: "/home/pi/robot-mower-advanced/data"  # Where data is stored
+  log_level: "info"  # How detailed the logs are: debug, info, warning, error
+  log_to_file: true  # Whether to save logs to a file
+  log_file: "logs/robot_mower.log"  # Where log files are saved
+  enable_remote_monitoring: true  # Allow the control panel to monitor
+  enable_telemetry: true  # Collect usage statistics
 ```
+
+**Plain English Explanation**:
+- `data_dir`: This is where the program saves all its data, like maps and settings
+- `log_level`: Controls how detailed the log messages are:
+  - `debug`: Extremely detailed (for troubleshooting)
+  - `info`: Normal operation details
+  - `warning`: Only warnings and errors
+  - `error`: Only errors
+- `log_to_file` and `log_file`: Controls whether log messages are saved to a file and where
+- `enable_remote_monitoring`: Allows the control panel to see what's happening
+- `enable_telemetry`: Collects data about how the system is running
+
+#### Mower Hardware Configuration
+
+```yaml
+mower:
+  name: "LawnMaster 5000"  # Your mower's nickname
+  cutting_width_mm: 320  # Width of the cutting blade in millimeters
+  max_speed_mps: 0.5  # Maximum speed in meters per second
+  min_turning_radius_m: 0.5  # How tight it can turn, in meters
+  wheel_diameter_mm: 200  # Wheel diameter in millimeters
+  encoder_pulses_per_revolution: 20  # How many pulses per wheel rotation
+  battery_capacity_mah: 5000  # Battery capacity in milliamp-hours
+  battery_voltage: 24.0  # Battery voltage
+  low_battery_threshold: 20  # Low battery warning at 20% remaining
+  critical_battery_threshold: 10  # Critical battery warning at 10%
+```
+
+**Plain English Explanation**:
+- `name`: Just a nickname for your mower
+- `cutting_width_mm`: How wide a path your mower cuts in one pass
+- `max_speed_mps`: Maximum speed - 0.5 means half a meter per second
+- `min_turning_radius_m`: How sharp the mower can turn - smaller is better
+- `wheel_diameter_mm`: The size of your wheels - needed for distance calculations
+- `encoder_pulses_per_revolution`: How many signals your wheel sensors send per rotation
+- Battery settings: Information about your battery for proper charge management
+- Threshold settings: When to trigger warnings about battery level
 
 ### SLAM Configuration
 
+SLAM stands for Simultaneous Localization And Mapping - it's how the mower creates and uses a map.
+
 ```yaml
-# SLAM configuration
 slam:
-  enabled: true
-  map_resolution: 0.05  # meters per pixel
-  map_size: 100.0  # size in meters
-  add_pose_interval: 1.0  # seconds
-  mapping_interval: 0.5  # seconds
-  localization_interval: 0.1  # seconds
-  optimization_interval: 5.0  # seconds
-  gps_weight: 0.7
-  imu_weight: 0.8
-  odometry_weight: 0.5
-  visual_odometry_scale: 0.01
-  map_save_interval: 60  # seconds
+  enabled: true  # Turn mapping on/off
+  map_resolution: 0.05  # How detailed the map is (meters per pixel)
+  map_size: 100.0  # Maximum map size in meters
+  add_pose_interval: 1.0  # How often to record position (seconds)
+  mapping_interval: 0.5  # How often to update the map (seconds)
+  localization_interval: 0.1  # How often to calculate position (seconds)
+  optimization_interval: 5.0  # How often to improve the map (seconds)
+  gps_weight: 0.7  # How much to trust GPS data (0-1)
+  imu_weight: 0.8  # How much to trust IMU data (0-1)
+  odometry_weight: 0.5  # How much to trust wheel encoder data (0-1)
+  visual_odometry_scale: 0.01  # Camera movement scaling factor
+  map_save_interval: 60  # How often to save the map (seconds)
 ```
+
+**Plain English Explanation**:
+- `enabled`: Turns the mapping system on or off
+- `map_resolution`: How detailed the map is - smaller numbers mean more detail
+- `map_size`: The maximum size of your map in meters
+- Interval settings: How often different operations happen
+- Weight settings: How much the system trusts each sensor type:
+  - Higher numbers (closer to 1) mean more trust
+  - Lower numbers (closer to 0) mean less trust
+- `map_save_interval`: How often the map is saved to storage
 
 ### Path Planning Configuration
 
+This section controls how the mower moves around your lawn.
+
 ```yaml
-# Navigation configuration
 navigation:
   path_planning:
-    enabled: true
-    safety_margin_m: 0.2  # meters
-    edge_detection_enabled: true
-    edge_follow_distance_m: 0.1  # meters
+    enabled: true  # Turn path planning on/off
+    safety_margin_m: 0.2  # Keep this distance from obstacles (meters)
+    edge_detection_enabled: true  # Detect and follow lawn edges
+    edge_follow_distance_m: 0.1  # How close to follow edges (meters)
   obstacle_avoidance:
-    enabled: true
-    detection_range_m: 3.0  # meters
-    stop_distance_m: 0.5  # meters
-  pattern: "adaptive"  # parallel, spiral, zigzag, perimeter_first, adaptive, custom
-  overlap_percent: 15.0
-  cutting_direction_degrees: 0.0
-  speed_normal: 0.4  # meters per second
-  speed_edge: 0.3  # meters per second for edge following
-  speed_docking: 0.2  # meters per second for docking
+    enabled: true  # Turn obstacle avoidance on/off
+    detection_range_m: 3.0  # Look this far ahead for obstacles (meters)
+    stop_distance_m: 0.5  # Stop this far from obstacles (meters)
+  pattern: "adaptive"  # Mowing pattern type
+  overlap_percent: 15.0  # How much to overlap each pass (percent)
+  cutting_direction_degrees: 0.0  # Direction to mow (degrees)
+  speed_normal: 0.4  # Normal moving speed (meters per second)
+  speed_edge: 0.3  # Speed when following edges
+  speed_docking: 0.2  # Speed when returning to dock
 ```
+
+**Plain English Explanation**:
+- Path planning controls how the mower decides where to go
+  - `safety_margin_m`: How far to stay away from all obstacles
+  - `edge_detection_enabled`: Whether to find and follow the edges of your lawn
+  - `edge_follow_distance_m`: How close to follow the lawn edges
+- Obstacle avoidance controls how the mower avoids running into things
+  - `detection_range_m`: How far ahead it looks for obstacles
+  - `stop_distance_m`: How far from an obstacle it will stop
+- `pattern`: The mowing pattern to use:
+  - `parallel`: Straight back-and-forth lines (like a farmer's field)
+  - `spiral`: Spiral from outside to inside or inside to outside
+  - `zigzag`: Similar to parallel but with diagonal movements
+  - `perimeter_first`: Mows around the edges first, then fills in
+  - `adaptive`: Automatically chooses the best pattern for your lawn shape
+- `overlap_percent`: How much each pass overlaps the previous one to avoid missed spots
+- Speed settings control how fast the mower moves in different situations
 
 ### Hardware Configuration
 
+This section maps physical hardware connections, especially GPIO pins on the Raspberry Pi.
+
 ```yaml
-# Motor configuration
 motors:
   left_motor:
-    forward_pin: 17
-    backward_pin: 18
-    pwm_pin: 12
-    pwm_frequency: 1000
+    forward_pin: 17  # GPIO pin for forward direction
+    backward_pin: 18  # GPIO pin for backward direction
+    pwm_pin: 12  # GPIO pin for speed control
+    pwm_frequency: 1000  # PWM frequency in Hz
   right_motor:
     forward_pin: 22
     backward_pin: 23
@@ -677,12 +521,11 @@ motors:
     pwm_pin: 25
     pwm_frequency: 1000
 
-# Sensor configuration
 sensors:
   ultrasonic:
-    - name: "front"
-      trigger_pin: 5
-      echo_pin: 6
+    - name: "front"  # Front obstacle sensor
+      trigger_pin: 5  # GPIO pin for trigger
+      echo_pin: 6  # GPIO pin for echo
     - name: "left_front"
       trigger_pin: 19
       echo_pin: 26
@@ -693,420 +536,268 @@ sensors:
       trigger_pin: 21
       echo_pin: 7
   imu:
-    i2c_bus: 1
-    i2c_address: 0x68
+    i2c_bus: 1  # I2C bus for the IMU sensor
+    i2c_address: 0x68  # I2C address of the IMU
   gps:
     enabled: true
-    serial_port: "/dev/ttyACM0"
-    baud_rate: 9600
+    serial_port: "/dev/ttyACM0"  # Serial port for GPS
+    baud_rate: 9600  # Communication speed
   camera:
     enabled: true
-    width: 640
-    height: 480
-    fps: 30
-    index: 0
+    width: 640  # Camera resolution width
+    height: 480  # Camera resolution height
+    fps: 30  # Frames per second
+    index: 0  # Camera index (if multiple cameras)
 ```
+
+**Plain English Explanation**:
+- Motor settings define which GPIO pins control the motors
+  - `forward_pin`: The pin that makes the motor go forward
+  - `backward_pin`: The pin that makes the motor go backward
+  - `pwm_pin`: The pin that controls speed
+  - `pwm_frequency`: How fast the speed control signal pulses
+- Sensor settings define how the sensors are connected
+  - Ultrasonic sensors have two pins: trigger (sends signal) and echo (receives signal)
+  - IMU (motion sensor) uses I2C communication protocol
+  - GPS uses a serial port connection
+  - Camera settings control resolution and frame rate
+
+**Important Note**: The GPIO pin numbers must exactly match your wiring. If these are incorrect, the motors and sensors won't work!
 
 ### Web Interface Configuration
 
+This section configures the web-based control panel.
+
 ```yaml
-# Web interface configuration
 web:
-  enabled: true
-  host: "0.0.0.0"
-  port: 7799
-  debug: false
-  enable_ssl: false
-  ssl_cert: ""
-  ssl_key: ""
-  session_lifetime: 86400  # seconds (24 hours)
-  enable_camera_stream: true
-  camera_stream_quality: 75
-  camera_stream_fps: 10
+  enabled: true  # Turn web interface on/off
+  host: "0.0.0.0"  # Listen on all network interfaces
+  port: 7799  # Network port to use
+  debug: false  # Enable debug mode
+  enable_ssl: false  # Use HTTPS instead of HTTP
+  ssl_cert: ""  # Path to SSL certificate
+  ssl_key: ""  # Path to SSL key
+  session_lifetime: 86400  # Session duration in seconds (24 hours)
+  enable_camera_stream: true  # Show camera feed
+  camera_stream_quality: 75  # JPEG quality (percent)
+  camera_stream_fps: 10  # Frames per second for camera stream
 ```
+
+**Plain English Explanation**:
+- `enabled`: Turns the web interface on or off
+- `host`: Which network interface to use (0.0.0.0 means all interfaces)
+- `port`: The network port number (you'll use this in your web browser)
+- `debug`: Shows detailed debugging information (only for development)
+- SSL settings: For secure HTTPS connections (recommended for internet access)
+- `session_lifetime`: How long until you need to log in again
+- Camera stream settings: Controls the live camera feed quality
+
+## Troubleshooting Guide for Beginners
+
+### Common Problems and Solutions
+
+#### Problem: Cannot Access Web Interface
+
+**Check if the web service is running**:
+```bash
+# This shows the status of the web service
+sudo systemctl status robot-mower-web.service
+```
+
+If it shows "active (running)" in green, the service is running correctly.
+
+If it shows any errors or "inactive", try:
+```bash
+# Restart the web service
+sudo systemctl restart robot-mower-web.service
+```
+
+**Check if you can reach the server**:
+```bash
+# Replace [server-ip] with your server's IP address
+ping [server-ip]
+```
+
+You should see replies. If not, there might be a network issue.
+
+**Check firewall settings**:
+```bash
+# Check if port 7799 is allowed
+sudo ufw status
+```
+
+If port 7799 is not in the list, allow it:
+```bash
+sudo ufw allow 7799/tcp
+```
+
+#### Problem: Motors Don't Move
+
+1. **Check power**:
+   - Verify battery voltage with a multimeter
+   - Check if the power switch is on
+   - Look for blown fuses
+
+2. **Check motor controller connections**:
+   - Verify that the GPIO pins match your configuration
+   - Verify that the motor wires are securely connected
+
+3. **Test motor controllers directly**:
+   ```bash
+   # Run the motor test utility
+   cd ~/robot-mower-advanced
+   python3 utils/test_motors.py
+   ```
+
+#### Problem: Sensors Not Working
+
+**For Ultrasonic Sensors**:
+1. Check voltage at the sensor (should be 5V)
+2. Verify GPIO pin connections (trigger and echo)
+3. Check for obstacles in front of the sensor during testing
+
+**For IMU Sensor**:
+```bash
+# Check if the I2C device is detected
+sudo i2cdetect -y 1
+```
+You should see a device at the address specified in your config (usually 0x68).
+
+**For Camera**:
+```bash
+# Test if camera is working
+libcamera-still -o test.jpg
+```
+This should capture an image. If it fails, check camera connection or enable the camera interface in `raspi-config`.
+
+### Using Log Files to Diagnose Problems
+
+Logs can help you find the cause of problems:
+
+```bash
+# View the main system log
+sudo journalctl -u robot-mower.service -n 100
+# This shows the last 100 messages from the mower service
+
+# View the web interface log
+sudo journalctl -u robot-mower-web.service -n 100
+```
+
+Look for lines marked as `ERROR` or `WARNING` which can indicate what's wrong.
+
+### Getting More Help
+
+If you're still stuck:
+
+1. Check the [Hardware Guide](hardware_guide.md) for detailed wiring diagrams
+2. Run the diagnostic tools:
+   ```bash
+   cd ~/robot-mower-advanced
+   python3 utils/hardware_test.py
+   ```
+3. Share your log files and problem description in our GitHub issues section
+
+---
+
+For more advanced troubleshooting and detailed system information, see the [Advanced Troubleshooting](#troubleshooting) section below.
 
 ## Usage
 
-### Web Interface
+The Robot Mower Advanced system is designed to be user-friendly through its web interface. Here's how to use it:
 
-The web interface provides a comprehensive dashboard for monitoring and controlling the robot mower. It's accessible at `http://[server-ip]:7799` after installation.
+### Web Interface Features
+
+Once you've set up the system and both components are communicating, you can control everything through the web interface:
 
 #### Main Dashboard
 
-![Dashboard](https://placehold.co/800x600/grey/white?text=Robot+Mower+Dashboard)
+The main dashboard gives you an overview of your mower's status:
 
-The main dashboard provides:
-- Current status and battery level
-- Mowing progress and statistics
-- Live map view with mower position
-- Quick controls (Start, Stop, Return to Dock)
+- Current battery level and charging status
+- Mowing progress and statistics (area covered, runtime)
+- Live map showing the mower's position and path
+- Quick controls (Start, Stop, Dock)
 - Alert notifications
-- Current weather conditions (if configured)
+- Weather conditions (if configured)
 
-#### Control Panel
+#### Zone Management
 
-The control panel allows direct control over the mower's operations:
-- Manual joystick control
-- Pattern selection
-- Cutting height adjustment
-- Speed settings
-- Motor status monitoring
-- Emergency stop
+Zones let you define different areas of your lawn:
 
-### Zone Management
+1. Click "Add New Zone"
+2. Draw the zone on the map
+3. Set properties like name, mowing pattern, and schedule
+4. Save the zone
 
-Zones can be defined to specify different mowing areas, each with their own settings:
+You can create multiple zones (e.g., front yard, back yard) with different settings for each.
 
-1. Navigate to the Zone Management page
-2. Click "Add New Zone"
-3. Draw the zone perimeter on the map
-4. Set zone properties:
-   - Name and priority
-   - Mowing pattern
-   - Cutting height
-   - Schedule preferences
-   - Edge handling behavior
-5. Save the zone configuration
+#### Scheduling
 
-Zones can be organized into mowing sequences for efficient lawn maintenance.
+To set up automatic mowing:
 
-### Scheduling
-
-The scheduling system allows you to set up automated mowing sessions:
-
-1. Navigate to the Scheduling page
+1. Go to the Scheduling page
 2. Create a new schedule with:
-   - Start time and duration
-   - Days of the week
-   - Zones to mow
+   - Days and times to mow
+   - Which zones to include
    - Weather conditions to avoid
 3. Enable/disable schedules as needed
 
-The system will automatically follow the schedule, taking into account battery levels and weather conditions.
+The mower will automatically follow the schedule and return to its dock when finished.
 
-### Manual Control
+#### Manual Control
 
-For direct control of the mower:
+For direct control:
 
-1. Navigate to the Manual Control page
-2. Use the directional pad or keyboard controls
+1. Go to the Manual Control page
+2. Use the on-screen controls to drive
 3. Adjust speed using the slider
-4. Enable/disable cutting motor
+4. Turn the cutting blade on/off
 5. Monitor sensor readings in real-time
 
-### Monitoring
-
-The monitoring section provides detailed information about the mower's operation:
-
-- Battery trends and charging cycles
-- Coverage maps showing mowed areas
-- Sensor data history
-- Motor performance metrics
-- System log viewer
-
-## Software Architecture
-
-### Directory Structure
-
-```
-robot-mower-advanced/
-├── config/                 # Configuration files
-│   ├── default_config.yaml # Default configuration (do not edit)
-│   └── local_config.yaml   # Local configuration (overrides defaults)
-├── data/                   # Data storage directory
-│   ├── lawn_images/        # Captured lawn images
-│   ├── lawn_reports/       # Generated reports
-│   ├── slam_maps/          # SLAM-generated maps
-│   └── zone_definitions/   # Mowing zone definitions
-├── hardware/               # Hardware interface modules
-│   ├── motor_control.py    # Motor control interface
-│   ├── sensors/            # Sensor interface modules
-│   └── peripherals/        # Additional hardware interfaces
-├── navigation/             # Navigation and path planning
-│   ├── advanced_path_planning.py # Advanced path planning
-│   ├── obstacle_avoidance.py     # Obstacle avoidance system
-│   └── path_execution.py   # Path execution controller
-├── perception/             # Perception system
-│   ├── camera_processor.py # Camera data processing
-│   ├── hailo_integration.py # Hailo NPU integration
-│   ├── object_detection.py # Object detection system
-│   └── slam/               # SLAM implementation
-│       ├── slam_core.py    # Core SLAM functionality
-│       └── map_manager.py  # Map management
-├── scripts/                # Installation and utility scripts
-│   ├── install_raspberry_pi.sh     # Raspberry Pi installation
-│   ├── install_ubuntu_server.sh    # Ubuntu Server installation
-│   ├── raspberry_pi_modules/       # Raspberry Pi installation modules
-│   └── ubuntu_install_modules/     # Ubuntu Server installation modules
-├── utils/                  # Utility functions
-│   ├── config_manager.py   # Configuration management
-│   ├── telemetry.py        # Telemetry and data collection
-│   └── logging_setup.py    # Logging configuration
-├── web/                    # Web interface
-│   ├── server.py           # Flask web server
-│   ├── static/             # Static web assets
-│   └── templates/          # HTML templates
-├── main.py                 # Main application entry point
-├── requirements.txt        # Python dependencies
-└── README.md               # This file
-```
-
-### Core Components
-
-#### Perception System
-
-The perception system processes sensor data to understand the mower's environment:
-
-- **SLAM Module**: Performs simultaneous localization and mapping
-  - Integrates sensor data from GPS, IMU, wheel encoders
-  - Maintains a consistent map of the environment
-  - Provides real-time position estimates
-
-- **Computer Vision**: Processes camera data
-  - Object detection for obstacles and boundaries
-  - Lawn health analysis
-  - Visual odometry for motion estimation
-
-- **Sensor Fusion**: Combines data from multiple sensors
-  - Kalman filtering for improved accuracy
-  - Uncertainty handling and confidence estimation
-  - Fault detection and sensor validation
-
-#### Navigation System
-
-The navigation system plans and executes mowing paths:
-
-- **Path Planning**: Plans efficient mowing patterns
-  - Multiple pattern types (parallel, spiral, etc.)
-  - Coverage optimization
-  - Path adaptation based on obstacles
-
-- **Obstacle Avoidance**: Ensures safe operation
-  - Real-time obstacle detection
-  - Path adjustment to avoid obstacles
-  - Safety margin enforcement
-
-- **Motion Control**: Manages motor commands
-  - Speed and direction control
-  - Smooth acceleration and deceleration
-  - Precision turning
-
-#### Web Interface
-
-The web interface provides user interaction:
-
-- **Flask Backend**: Handles API requests and business logic
-  - RESTful API for mower control
-  - WebSocket for real-time updates
-  - Authentication and security
-
-- **Frontend**: User interface components
-  - Responsive dashboard
-  - Interactive map visualization
-  - Controls and settings management
-
-### Module Interaction
-
-The system uses an event-driven architecture with these main interaction patterns:
-
-1. **Perception Pipeline**:
-   ```
-   Sensors → Data Preprocessing → Feature Extraction → SLAM → World Model
-   ```
-
-2. **Decision Making**:
-   ```
-   World Model → Path Planning → Obstacle Avoidance → Motion Commands
-   ```
-
-3. **Control Loop**:
-   ```
-   Motion Commands → Motor Controllers → Encoders → Feedback → Adjustment
-   ```
-
-4. **User Interaction**:
-   ```
-   Web UI → API Calls → Command Processing → Status Updates → Web UI
-   ```
-
-## Troubleshooting
-
-### Common Issues
-
-#### Mower Won't Start
-
-1. **Check power**:
-   ```bash
-   # On the Raspberry Pi
-   sudo systemctl status robot-mower.service
-   # Check voltage
-   python3 -c "import hardware.power_monitor as pm; print(pm.get_battery_voltage())"
-   ```
-
-2. **Check for errors**:
-   ```bash
-   # View logs
-   sudo journalctl -u robot-mower.service -n 100
-   ```
-
-3. **Check hardware connections**:
-   - Verify motor controller connections
-   - Check for blown fuses
-   - Ensure emergency stop is not engaged
-
-#### Web Interface Unavailable
-
-1. **Check service status**:
-   ```bash
-   # On the Ubuntu server
-   sudo systemctl status robot-mower-web.service
-   ```
-
-2. **Check network connectivity**:
-   ```bash
-   ping [raspberry-pi-ip]
-   ```
-
-3. **Check firewall settings**:
-   ```bash
-   sudo ufw status
-   # Ensure port 7799 is allowed
-   sudo ufw allow 7799/tcp
-   ```
-
-#### Poor Navigation Performance
-
-1. **Check sensor data**:
-   ```bash
-   # On the Raspberry Pi
-   python3 -c "import utils.diagnostics as diag; diag.run_sensor_test()"
-   ```
-
-2. **Verify SLAM map**:
-   - Check the generated map in the web interface
-   - Ensure the map has good coverage
-   - Look for inconsistencies in the map
-
-3. **Recalibrate sensors**:
-   ```bash
-   # Run calibration tool
-   cd /home/pi/robot-mower-advanced
-   python3 utils/calibrate_sensors.py
-   ```
-
-### Diagnostic Tools
-
-The system includes several diagnostic tools to help troubleshoot issues:
-
-1. **Hardware Test**:
-   ```bash
-   cd /home/pi/robot-mower-advanced
-   python3 utils/hardware_test.py
-   ```
-   This runs a comprehensive test of all hardware components.
-
-2. **SLAM Diagnostics**:
-   ```bash
-   cd /home/pi/robot-mower-advanced
-   python3 perception/slam/diagnostic.py
-   ```
-   This checks the SLAM system and can generate diagnostic maps.
-
-3. **Network Diagnostics**:
-   ```bash
-   cd /home/pi/robot-mower-advanced
-   python3 utils/network_diagnostic.py
-   ```
-   This verifies connectivity between the Raspberry Pi and Control Panel.
+This is useful for testing or for moving the mower to a specific location.
 
 ## Maintenance
 
-### Regular Maintenance Tasks
+Regular maintenance will keep your mower running reliably:
 
-#### Software Updates
+### Software Maintenance
 
 ```bash
-# On both Raspberry Pi and Ubuntu server
-cd /home/pi/robot-mower-advanced  # Or appropriate path
+# Update the software (on both Raspberry Pi and Server)
+cd ~/robot-mower-advanced
 git pull
 sudo ./scripts/update.sh
 ```
 
-#### Database Maintenance
-
-```bash
-# On Ubuntu server
-cd /home/ubuntu/robot-mower-advanced  # Or appropriate path
-python3 utils/maintain_database.py
-```
-
-#### Log Rotation
-
-Log rotation is configured automatically, but you can manually rotate logs:
-
-```bash
-# On Raspberry Pi
-sudo logrotate -f /etc/logrotate.d/robot-mower
-```
-
 ### Hardware Maintenance
 
-Regular hardware maintenance should include:
+1. **Blades**:
+   - Check for damage every 20-30 hours
+   - Replace when dull or damaged
 
-1. **Blade Inspection and Replacement**:
-   - Check blades for damage every 20-30 hours of operation
-   - Replace blades when dulled or damaged
-
-2. **Sensor Cleaning**:
+2. **Sensors**:
    - Clean ultrasonic sensors with compressed air
-   - Wipe camera lens with microfiber cloth
+   - Wipe camera lens with a microfiber cloth
    - Remove debris from wheel encoders
 
-3. **Battery Maintenance**:
-   - Check battery terminals for corrosion
-   - Perform full discharge/charge cycle monthly
+3. **Battery**:
+   - Check connections for corrosion
+   - Perform a full discharge/charge cycle monthly
    - Replace batteries every 2-3 years
 
-4. **Mechanical Inspection**:
-   - Check for loose screws and connections
-   - Inspect wheels and drive train
+4. **Mechanical**:
+   - Check for loose screws and bolts
+   - Inspect wheels and drive system
    - Lubricate moving parts as needed
 
 ## Contributing
 
-To contribute to the project, please follow these steps:
+We welcome contributions to the project! To contribute:
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Environment Setup
-
-```bash
-# Clone your fork
-git clone https://github.com/yourusername/robot-mower-advanced.git
-cd robot-mower-advanced
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Run tests
-pytest
-```
-
-### Coding Standards
-
-- Follow PEP 8 for Python code
-- Use meaningful variable and function names
-- Add docstrings to all functions and classes
-- Write unit tests for new functionality
-- Keep modules focused and single-purpose
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
 ## License
 
@@ -1114,4 +805,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Note**: This is an open-source project, and while we strive to make it as reliable and safe as possible, use it at your own risk. Always maintain proper supervision of autonomous lawn mowing equipment.
+**Note**: This is an open-source project. While we strive to make it reliable and safe, use it at your own risk and always maintain proper supervision of autonomous lawn mowing equipment.
